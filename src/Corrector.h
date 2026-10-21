@@ -104,6 +104,55 @@ inline float CorrectDeficit(float deficitBefore, float deltaMax, bool spillOverf
     return target;
 }
 
+// ---------------------------------------------------------------------------
+// Recasting a spell that is still active: the give-back window.
+//
+// The game does not always swap an active fortification for its recast in one step.
+// Measured on 21 October 2026 (docs/SPEC.md section 5.5), the maximum fell and rose
+// again 17 ms, 115 ms and 680 ms apart. The 17 ms one is certainly a recast: the spell
+// cost came with the fall, and an expiry costs nothing. The other two carry the cost
+// with the rise, so they are either a recast in two steps or an expiry landing just
+// before a cast already under way; the log cannot tell them apart, and to the player
+// both are the same act, keeping the buff up. In every case the fall looks like an
+// expiry, and the rule spills whatever sits above the unbuffed maximum. On a full pool
+// that is the whole fortification: a recast that costs 278 in the game would cost 578
+// with the fix, depending only on timing.
+//
+// So the spill is remembered for a short time, and an increase that follows within
+// that time gives it back, up to the size of the increase. A recast then ends where a
+// one-step recast ends: the spell cost paid, nothing else.
+//
+// The window is a JUDGEMENT, not a measurement. Measured: the three gaps above, and the
+// fastest item swap by hand, 700 ms (28 August 2026). The two ways of missing are not
+// equal. Too short, and a recast loses up to the whole fortification. Too long, and a
+// quick swap by hand gets back the overflow it would otherwise lose, which only makes
+// the swap neutral: the give-back never exceeds what was spilled, so it cannot create
+// Magicka. 1000 ms covers every gap measured and leans toward the harmless side. Every
+// rise within kRecastWatchMs of a spill is logged (RECAST WINDOW), inside the window or
+// not, so the choice can be checked against more play.
+inline constexpr unsigned long long kRecastWindowMs = 1000;
+
+// How long after a spill a rise is still logged, to see what the window misses.
+inline constexpr unsigned long long kRecastWatchMs = 5000;
+
+// What the clamp throws away on a decrease: the part of the pool above the new
+// maximum. Zero when nothing overflows, on an increase, or when the overflow is kept.
+inline float SpilledOnDecrease(float deltaMax, float deficitAfter, bool spillOverflow)
+{
+    if (!(deltaMax < 0.0f) || !spillOverflow) { return 0.0f; }
+    const float over = deficitAfter - deltaMax;
+    return over > 0.0f ? over : 0.0f;
+}
+
+// How much of a recent spill an increase gives back.
+inline float RecastGiveBack(float spilled, unsigned long long msSinceSpill, float deltaMax)
+{
+    if (!(spilled > 0.0f) || !(deltaMax > 0.0f) || msSinceSpill > kRecastWindowMs) {
+        return 0.0f;
+    }
+    return spilled < deltaMax ? spilled : deltaMax;
+}
+
 // Tolerance for every comparison in this file. The proportional term is required: a
 // Fortify Intelligence 110 moves the maximum by 220 points, and a fixed hundredth of a
 // point window would classify every large fortification as unexpected and leave the mod
@@ -259,9 +308,11 @@ struct Decision {
 // deficitAfter    deficit as it stands now, after the engine has had its say. This is
 //                 the value the correction is computed FROM, so that anything the
 //                 player paid for in the same tick is preserved rather than refunded.
+// giveBack        what RecastGiveBack() allows on this transition, 0 otherwise. Used
+//                 only on an increase that the rule corrects.
 inline Decision DecideCorrection(float deltaMax, float deficitBefore, float deficitAfter,
                                  EnginePolicy policy, const CompensationConfig& cfg,
-                                 bool allowedToWrite)
+                                 bool allowedToWrite, float giveBack = 0.0f)
 {
     Decision d{};
     const float eps = cfg.epsilon > 0.0f ? cfg.epsilon : 0.01f;
@@ -305,7 +356,13 @@ inline Decision DecideCorrection(float deltaMax, float deficitBefore, float defi
 
     // Computed from the deficit as it stands NOW, not from the one before. That is what
     // keeps a spell cast in the same tick charged to the player.
-    const float target = CorrectDeficit(deficitAfter, deltaMax, cfg.clampOverflow);
+    float target = CorrectDeficit(deficitAfter, deltaMax, cfg.clampOverflow);
+    if (increased && giveBack > 0.0f) {
+        // Never above the deficit the engine left: the give-back returns spilled
+        // Magicka, it never adds to what the increase itself would have granted.
+        target += giveBack;
+        if (target > deficitAfter) { target = deficitAfter; }
+    }
 
     if (std::fabs(target - deficitAfter) <= eps) {
         // The commonest instance is a fortification expiring on a full pool: the target

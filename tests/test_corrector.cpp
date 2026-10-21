@@ -480,6 +480,142 @@ static void TestEngineMoveWarning()
           mpf::EngineRaisedDeficitOnDecrease(-22.0f, -100.0f, -95.0f, eps), 5.0f);
 }
 
+// Recasting an active spell, which the game sometimes does in two steps (Corrector.h,
+// kRecastWindowMs; docs/SPEC.md section 5.5). Field values from 21 October 2026,
+// session 4. "Current" is maximum + deficit.
+static void TestRecast()
+{
+    std::printf("\n-- recast of an active spell: the give-back window ------------------\n");
+    const auto cfg = Glass();
+    const auto pol = mpf::EnginePolicy::kEngineIgnores;
+
+    {
+        // 21:36:08.324 then .439, 115 ms apart: the 95 % buff leaves (current 322.71 of
+        // 607), then comes back with its cost. Without the give-back the 0.71 above 322
+        // was lost; with it the recast costs exactly 278.
+        const auto a = mpf::DecideCorrection(-285.0f, -284.2858f, -284.2858f, pol, cfg, true);
+        CheckReason("115 ms split, step 1: the expiry-shaped half is corrected", a.reason,
+                    mpf::DecisionReason::kApply);
+        Check("115 ms split, step 1: deficit written", a.newDeficit, 0.0f);
+        const float spill = mpf::SpilledOnDecrease(-285.0f, -284.2858f, true);
+        Check("115 ms split: spill remembered", spill, 0.7142f);
+        const float back = mpf::RecastGiveBack(spill, 115, 285.0f);
+        Check("115 ms split: given back in full", back, 0.7142f);
+        const auto b = mpf::DecideCorrection(285.0f, 0.0f, -278.0f, pol, cfg, true, back);
+        Check("115 ms split, step 2: deficit written", b.newDeficit, -562.2858f);
+        Check("115 ms split: current after = 322.71 - 278", 607.0f + b.newDeficit, 44.7142f);
+    }
+    {
+        // The same shape on a FULL pool (622 of 622), which the session did not hit:
+        // without the give-back the recast would cost 278 + 300.
+        const auto a = mpf::DecideCorrection(-300.0f, 0.0f, 0.0f, pol, cfg, true);
+        CheckReason("full pool split, step 1: pool full at 322, nothing to write",
+                    a.reason, mpf::DecisionReason::kAlreadyCorrect);
+        const float spill = mpf::SpilledOnDecrease(-300.0f, 0.0f, true);
+        Check("full pool split: 300 spilled", spill, 300.0f);
+        const auto without = mpf::DecideCorrection(300.0f, 0.0f, -278.0f, pol, cfg, true);
+        Check("full pool split, no give-back: current 44 (pays 578)",
+              622.0f + without.newDeficit, 44.0f);
+        const float back = mpf::RecastGiveBack(spill, 115, 300.0f);
+        const auto b = mpf::DecideCorrection(300.0f, 0.0f, -278.0f, pol, cfg, true, back);
+        CheckReason("full pool split, step 2: the engine's value is already right",
+                    b.reason, mpf::DecisionReason::kAlreadyCorrect);
+        const float dEnd = b.reason == mpf::DecisionReason::kApply ? b.newDeficit : -278.0f;
+        Check("full pool split, with give-back: current 344 (pays 278)", 622.0f + dEnd,
+              344.0f);
+    }
+    {
+        // 21:34:02.649 then .666: removal and cost in the same poll, so nothing spills
+        // and nothing is given back; the log's values are reproduced.
+        const auto a = mpf::DecideCorrection(-300.0f, -283.0f, -561.0f, pol, cfg, true);
+        Check("one-poll recast, step 1: deficit written", a.newDeficit, -261.0f);
+        const float spill = mpf::SpilledOnDecrease(-300.0f, -561.0f, true);
+        Check("one-poll recast: nothing spilled", spill, 0.0f);
+        const auto b = mpf::DecideCorrection(300.0f, -261.0f, -261.0f, pol, cfg, true,
+                                             mpf::RecastGiveBack(spill, 17, 300.0f));
+        Check("one-poll recast, step 2: deficit written as logged", b.newDeficit, -561.0f);
+    }
+    {
+        // 22:45:38.396 then 22:45:40.489: the buff expired (current 339 of 622, 17 above
+        // the new 322) and was cast again 2.09 s later. Not a recast: no give-back.
+        const float spill = mpf::SpilledOnDecrease(-300.0f, -283.0f, true);
+        Check("expiry then cast 2.09 s later: 17 spilled", spill, 17.0f);
+        Check("expiry then cast 2.09 s later: nothing given back",
+              mpf::RecastGiveBack(spill, 2093, 300.0f), 0.0f);
+        const auto b = mpf::DecideCorrection(300.0f, 0.0f, -278.0f, pol, cfg, true, 0.0f);
+        Check("expiry then cast 2.09 s later: deficit written as logged", b.newDeficit,
+              -578.0f);
+    }
+    {
+        // 21:46:05.428 then 21:46:06.108, 680 ms apart: the buff leaves (current 324 of
+        // 607, 2 above the new 322), and comes back with its cost. Inside 1000 ms.
+        const auto a = mpf::DecideCorrection(-285.0f, -283.0f, -283.0f, pol, cfg, true);
+        Check("680 ms split, step 1: deficit written", a.newDeficit, 0.0f);
+        const float spill = mpf::SpilledOnDecrease(-285.0f, -283.0f, true);
+        Check("680 ms split: 2 spilled", spill, 2.0f);
+        const auto b = mpf::DecideCorrection(285.0f, 0.0f, -278.0f, pol, cfg, true,
+                                             mpf::RecastGiveBack(spill, 680, 285.0f));
+        Check("680 ms split: current after = 324 - 278", 607.0f + b.newDeficit, 46.0f);
+    }
+    {
+        // 28 August 21:29:09 then :10, 0.7 s apart: an item off and on by hand on a full
+        // pool. The fix spilled 20 then; with the window the round trip is neutral,
+        // which is the harmless side of the judgement (Corrector.h).
+        const float spill = mpf::SpilledOnDecrease(-20.0f, 0.0f, true);
+        Check("ring off and on by hand, 0.7 s: neutral now",
+              mpf::RecastGiveBack(spill, 700, 20.0f), 20.0f);
+        // Session 1 of 21 October, 1.25 s: outside, the 20 stay spilled.
+        Check("ring off and on by hand, 1.25 s: 20 stay spilled",
+              mpf::RecastGiveBack(spill, 1250, 20.0f), 0.0f);
+    }
+    // The window's edges, and the caps.
+    Check("give-back at exactly 1000 ms", mpf::RecastGiveBack(300.0f, 1000, 300.0f), 300.0f);
+    Check("give-back at 1001 ms", mpf::RecastGiveBack(300.0f, 1001, 300.0f), 0.0f);
+    Check("give-back capped by the increase", mpf::RecastGiveBack(300.0f, 50, 20.0f), 20.0f);
+    Check("no give-back on a decrease", mpf::RecastGiveBack(300.0f, 50, -20.0f), 0.0f);
+    Check("no spill on an increase", mpf::SpilledOnDecrease(300.0f, 0.0f, true), 0.0f);
+    Check("no spill when the overflow is kept", mpf::SpilledOnDecrease(-300.0f, 0.0f, false),
+          0.0f);
+    Check("no spill without overflow", mpf::SpilledOnDecrease(-300.0f, -400.0f, true), 0.0f);
+    {
+        // A give-back passed with a decrease is ignored.
+        const auto a = mpf::DecideCorrection(-20.0f, -100.0f, -100.0f, pol, cfg, true, 50.0f);
+        Check("give-back ignored on a decrease", a.newDeficit, -80.0f);
+        // And it never lifts the deficit above what the engine left.
+        const auto b = mpf::DecideCorrection(20.0f, -100.0f, -100.0f, pol, cfg, true, 500.0f);
+        CheckReason("give-back never above the engine's deficit: nothing to write",
+                    b.reason, mpf::DecisionReason::kAlreadyCorrect);
+    }
+    {
+        // Scenario 6 of chapter 8 with the worst timing for the fix's neutrality: the
+        // buff expires on a full pool and is recast within the window, ten times. Each
+        // loop must cost exactly the spell, never less: no positive drift.
+        float current = 622.0f;
+        float minPaid = 1e9f, maxPaid = -1e9f;
+        for (int i = 0; i < 10; ++i) {
+            // expiry at the current pool: max 622 -> 322
+            const float dBefore = current - 622.0f;
+            const auto a = mpf::DecideCorrection(-300.0f, dBefore, dBefore, pol, cfg, true);
+            const float d1 = (a.reason == mpf::DecisionReason::kApply) ? a.newDeficit : dBefore;
+            const float spill = mpf::SpilledOnDecrease(-300.0f, dBefore, true);
+            // recast 100 ms later, cost 278 charged in the same poll
+            const float dAfter = d1 - 278.0f;
+            const auto b = mpf::DecideCorrection(300.0f, d1, dAfter, pol, cfg, true,
+                                                 mpf::RecastGiveBack(spill, 100, 300.0f));
+            const float d2 = (b.reason == mpf::DecisionReason::kApply) ? b.newDeficit : dAfter;
+            const float next = 622.0f + d2;
+            const float paid = current - next;
+            if (paid < minPaid) { minPaid = paid; }
+            if (paid > maxPaid) { maxPaid = paid; }
+            current = 622.0f;   // regenerate fully before the next loop
+        }
+        Check("ten recasts at expiry, full pool: cheapest loop costs the spell", minPaid,
+              278.0f);
+        Check("ten recasts at expiry, full pool: dearest loop costs the spell", maxPaid,
+              278.0f);
+    }
+}
+
 int main()
 {
     TestCorrectDeficit();
@@ -487,6 +623,7 @@ int main()
     TestDecision();
     TestFieldCases();
     TestEngineMoveWarning();
+    TestRecast();
     std::printf("\n%s\n", g_fail == 0 ? "all corrector tests passed"
                                       : "THERE WERE FAILURES");
     return g_fail == 0 ? 0 : 1;

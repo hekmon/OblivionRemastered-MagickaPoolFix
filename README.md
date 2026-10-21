@@ -125,6 +125,14 @@ assumption. If a game update ever fixes the bug, the log says so in capitals, be
 plugin would then be subtracting the change twice. `iEnginePolicy` controls this; see
 [`docs/SPEC.md`](docs/SPEC.md) section 5.
 
+One part is a judgement call rather than a measurement. Recasting a buff that is still
+active sometimes reaches the game as the old effect leaving, then the new one arriving
+up to 680 ms later. Taken literally, the first half is an expiry and would spill
+everything above the unbuffed maximum. So a rise of the maximum within **1 second** of
+such a spill gives the spill back, never more. The window was chosen, not measured; the
+log reports every case near it, so it can be adjusted
+([`docs/SPEC.md`](docs/SPEC.md) section 5.5).
+
 The model is `src/MagickaMath.h`; when to apply it is `src/Corrector.h`. Both are free of
 any Windows dependency and covered by host unit tests that replay the measured transitions.
 
@@ -162,18 +170,26 @@ forgiven ([`docs/SPEC.md`](docs/SPEC.md) section 4.4).
   95 % magnitude, the spell-effectiveness cap when armor is worn, an item swap, and what
   reads as a Drain Magicka.
 
-Every number is in [`docs/SPEC.md`](docs/SPEC.md), sections 4.6 to 4.8. Since 0.9.1 the
-correction itself has not changed, only the calibration bookkeeping, the `.conf` (its text,
-and it is never overwritten any more) and the log. The development version, 1.0.0-dev, makes the log describe the game build, the
-loaded mods and the character from its first lines; it has not been run in game yet.
+**Tested in game** with the development version, 1.0.0-dev, on **21 October 2026**: four
+sessions, the longest 1 h 37 min, 52 transitions in all, no failure, no error line.
+
+- The character data the log prints matched the character sheet, field by field.
+- The buff expired three times with the pool well below the unbuffed maximum; the game
+  would have left -65.7, -80.6 and -180.4, and the fix kept current magicka.
+- First item acting by script (the Scales of Pitiless Justice), first level-up, and two
+  vampirism stage changes, which do not touch magicka.
+
+Every number is in [`docs/SPEC.md`](docs/SPEC.md), sections 4.6 to 4.9. Since 0.9.1 the
+rule itself has not changed. 1.0.0-dev adds the recast window above, which has not been
+run in game yet, a log that describes the game build, the loaded mods and the character,
+and a `.conf` that is never overwritten.
 
 **Open:**
 
-- **Not yet tested in game**: removing a Fortify Intelligence/Magicka item at a partial
-  pool, ten activation/expiry loops in a row, a Fortify Magicka alone expiring at a low pool
-  (UESP describes a floor at zero for the original game, which would make the correction
-  overshoot; [`docs/SPEC.md`](docs/SPEC.md) section 10.5), potions, altars and blessings,
-  leveling up, and the character data of 1.0.0-dev.
+- **Not yet tested in game**: the recast window, a Fortify Magicka alone expiring at a low
+  pool (UESP describes a floor at zero for the original game; none was seen when a Fortify
+  Intelligence and Magicka expired, [`docs/SPEC.md`](docs/SPEC.md) section 10.5), potions,
+  altars and blessings, and a level-up that raises Intelligence.
 - **A design question**: the fix cancels a drain's effect on current magicka. Whether it
   should is open ([`docs/SPEC.md`](docs/SPEC.md) section 10.5).
 
@@ -304,6 +320,9 @@ profile folder replaced by `%USERPROFILE%`.
 - **Permanent attribute changes are not corrected.** A level-up changes the base attribute,
   not a modifier, so the rule does not apply to it. Since 1.0.0-dev the log reports it.
   [`docs/SPEC.md`](docs/SPEC.md) section 10.3 explains when that can matter.
+- **The recast window is a judgement.** One second, chosen to cover the recasts measured;
+  a slower recast would still lose the overflow, and a hand swap faster than a second is
+  neutral. [`docs/SPEC.md`](docs/SPEC.md) section 5.5.
 - **Drains are cancelled like any other change.** UESP documents a Drain Magicka as taking
   current magicka; with the fix it does not, on a pool that is not full. An open design
   question ([`docs/SPEC.md`](docs/SPEC.md) section 10.5).

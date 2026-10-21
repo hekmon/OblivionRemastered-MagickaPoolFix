@@ -2588,3 +2588,42 @@ before the tests), and a level-up.
 
 Built: 190 OK, 0 FAIL, 0 warnings, imports unchanged, `.conf` byte-identical. Not run in
 game.
+
+## 21 October 2026 — session 4: expiries below zero, a level-up, and recasts in two steps
+
+1 h 37 min with the session 3 build (SPEC §4.9): 42 transitions, 31 writes, no failure,
+no error, no crash. The spell was kept up throughout, with and without armor; one
+level-up; two vampirism stage changes.
+
+- **Scenario 4 of chapter 8, measured three times**: the buff expired with the pool at
+  234, 219 and 104; vanilla would have left −65.7, −80.6 and −180.4. The engine did not
+  move the deficit, so no floor at zero on a fortify expiry (SPEC §10.5).
+- **The level-up** came after a night's rest, pool full, Intelligence unchanged: harmless,
+  and not the test §10.3 wants.
+- **Vampirism** moved exactly the stage bonus in the base values, in two steps: the
+  deduction of the previous entry holds. The "another save loaded?" line it produced now
+  also names an ability.
+- **Security +40** in the base values: probably the Skeleton Key carried. Not confirmed.
+
+**A design gap, found in this log and filled with a judgement.** A recast of an active
+spell sometimes reaches the arrays as a fall then a rise: 17 ms, 115 ms and 680 ms apart
+here. The fall is treated as an expiry and spills the pool above the unbuffed maximum;
+on a full pool that would make a 278 recast cost 578. Losses here were 0.7 and 2 points.
+Now the spill is remembered and given back by a rise within a window, never more than
+the spill (`SpilledOnDecrease`, `RecastGiveBack` in `Corrector.h`; SPEC §5.5, chapter 8
+scenario 7).
+
+The window was first set to 500 ms, from the 17 and 115 ms cases; the maintainer asked
+why not 100 ms (115 ms rules it out), then agreed 500 ms. Writing the docs I listed every
+fall followed by a rise and found the 680 ms case I had missed, so I reported it before
+going further. The maintainer agreed 1000 ms, on condition that it is documented as
+guesswork and monitored. It is: every rise within 5 s of a spill writes a
+`RECAST WINDOW` line (gap, inside or outside, given back or lost, where the cost was
+charged), and the heartbeat carries the totals.
+
+Side effect, accepted: an item taken off and put back on a full pool within a second is
+now neutral; the 28 August swap (0.7 s) lost 20 then and would not now.
+
+Built: 223 OK (33 new: give-back, field replays of 21:34, 21:36, 21:46 and 22:45, the
+28 August swap, ten recasts at expiry), 0 FAIL, 0 warnings, imports unchanged, `.conf`
+byte-identical. Not run in game.

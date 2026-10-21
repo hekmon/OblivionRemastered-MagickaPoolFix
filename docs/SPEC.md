@@ -483,7 +483,7 @@ than levelling. Not yet confirmed by the player: the current Luck has to be read
 
 | Withdrawn claim | Why it was wrong |
 |---|---|
-| "two distinct spells, deduced from the variability of the durations 55 / 86 / 80 / 124 / 74 s" | a recast during the buff emits no event; all these gaps are compatible with a single 55 s spell being recast |
+| "two distinct spells, deduced from the variability of the durations 55 / 86 / 80 / 124 / 74 s" | a recast during the buff at the same magnitude, in one step, emits no event; all these gaps are compatible with a single 55 s spell being recast (some recasts do emit two events, §5.5) |
 | "effective skill is capped at 100, the cost is at its floor, so only a different base cost remains possible" | the cap is indeed documented for vanilla ([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making)) but mod 1846 removes it with a binary patch. The base costs 1350 and 1340 that followed from it are wrong |
 | "at effective skill ≥ 116.67 spells would become free, which is not observed, so the cap is active" | doubly invalid reasoning: the cap is not active, and the mod's `> 100` branch is hyperbolic, so no zero or negative cost is reachable whatever the skill. The mod deliberately works around this problem |
 
@@ -627,9 +627,9 @@ Read again on 21 October 2026, with the character's equipment seen in game (§4.
 
 ### 4.9 Sessions of 21 October 2026 (1.0.0-dev)
 
-Three short sessions on the test bench, now with OblivionRemasteredPerformanceFix (§10.7).
+Four sessions on the test bench, now with OblivionRemasteredPerformanceFix (§10.7).
 First line every time: `ACTIVE`, PE `0xF19077A4 (validated build)`, `conf found`, no
-setting away from its default. Player found 41 s, 11 s and 11 s after start. Every log
+setting away from its default. Player found 41 s, 11 s, 11 s and 11 s after start. Every log
 ends on "player instance ... no longer valid" when the player quit. That message named only a save load or a moved
 object; it now also names a quit and the game closing.
 
@@ -683,7 +683,8 @@ What it adds:
 - The estimated pool is consistent through every step (622 → 322 → 302 → 322 → ...).
   It was compared with the screen only at load, with the pool full.
 
-Still not covered: an expiry with the pool not full, and a level-up.
+Not covered by session 3: an expiry with the pool not full, and a level-up. Session 4
+covers both.
 
 **The plugin's own time.** This build reports it: **62 to 72 ms per second** on the
 plugin's thread, nearly all of it a walk of the whole address space (the memory map
@@ -702,6 +703,54 @@ Meanwhile UE4SS's log shows the Lua mod MagicSkillLevelingFixed retrying "Player
 `[DEDUCTION]`: a fault in UE4SS or one of its Lua mods during shutdown, not in this
 plugin. No symbols for UE4SS, so the faulting function is not identified. The four dumps
 of 6 August are a different crash, a write to address 0 inside the game executable.
+
+Session 4, 1 h 37 min (21:33 to 23:10), same build as session 3: **42 transitions, 31
+writes, no failure, no error line, no crash**. The player kept the +300 spell up for most
+of it, recasting it before or as it ran out, with and without armor (95 % magnitude,
+§10.4), gained a level, and went through two vampirism stages.
+
+- **Expiries at a partial pool, measured.** Three times the spell ended with the pool
+  well below the unbuffed maximum. The engine left the deficit alone each time (moved by
+  regeneration only, +0.37 to +0.73), and the fix kept current magicka:
+
+  | time | before (current / max) | vanilla would leave | the fix left |
+  |---|---|---|---|
+  | 21:53:19 | 234.0 / 622 | **−65.7** / 322 | 234.3 / 322 |
+  | 22:05:12 | 219.0 / 622 | **−80.6** / 322 | 219.4 / 322 |
+  | 22:07:01 | 103.9 / 607 | **−180.4** / 322 | 104.6 / 322 |
+
+  This is scenario 4 of chapter 8 on the build in use, and the floor question of §10.5
+  answered for a fortify expiring: no floor.
+- **Expiries with an overflow**: four more, current above the new maximum (322.7, 324,
+  353.7 and 339 for a new maximum of 322). The rule clamped them to a full pool. Three of
+  them are the first half of a fall-then-rise, below.
+- **Recasts in two steps.** Some recasts arrive as a fall then a rise of the maximum, the
+  first half shaped like an expiry. That is what §5.5 is about; the cases:
+
+  | fall | rise | gap | spell cost charged with | spilled |
+  |---|---|---|---|---:|
+  | 21:34:02.649 | .666 | 17 ms | the fall | 0 |
+  | 21:36:08.324 | .439 | 115 ms | the rise | 0.71 |
+  | 21:46:05.428 | 06.108 | 680 ms | the rise | 2 |
+  | 22:45:38.396 | 40.489 | 2.09 s | the rise | 17 |
+
+  The others are one-step recasts: removal, new effect and cost in the same poll (21:35:00,
+  21:36:50, 21:58:00, a magnitude change of ±15 between 100 % and 95 %), or a recast at the
+  same magnitude, which moves no modifier and only shows as the cost.
+- **Costs**: 278 every time a cost is visible, before the level-up. Base Luck went from 63
+  to 64 at the level-up; §4.7.3 predicts 277 for the next cast with the ring.
+- **The level-up**, 23:09:16, after a night's rest: level 37 → 38, Agility +3, Personality
+  +5, Luck +1, base health +10, Intelligence unchanged. The pool was full before and after
+  (§10.3).
+- **Vampirism, twice.** At 22:09:48 the base values the log reads lost exactly 10 on
+  Strength, Willpower, Speed and the seven vampire skills, and 4.5 s later gained 15 on
+  each; after the night, the same with 15 then 20. The stage bonus is in the base values
+  (§10.8), it moves in two steps, and it never touches Intelligence or Magicka. The log
+  read each step as "another save loaded?"; that line now also names an ability.
+- **Security 82 → 122** in the base values at 22:46:34, a +40 with no level-up. `[DEDUCTION]`:
+  an ability, such as the one the Skeleton Key gives while carried; not confirmed.
+- **Own time**: 53 to 84 ms per second, the memory map refresh again (105 to 216 ms). The
+  build after session 3 removes it.
 
 ## 5. The correction rule
 
@@ -904,6 +953,62 @@ points, and a fixed window of one hundredth would classify any large fortificati
 "unexpected behavior", and hence leave the mod permanently inactive. Conversely, the constant term keeps a
 2-point variation judged to within a hundredth.
 
+### 5.5 Recasting an active spell: the give-back window (a judgement)
+
+Session 4 (§4.9) showed that recasting a fortification that is still active does not
+always reach the modifier arrays in one step. Sometimes the old effect leaves and the
+new one arrives in the same poll; sometimes the maximum **falls**, then **rises** again
+up to 680 ms later. The fall looks exactly like an expiry, so the rule spills whatever
+sits above the unbuffed maximum, and the rise is then corrected as a new cast. On a full
+pool, a recast the game charges 278 would cost 278 + 300 = 578 with the fix; what decides
+it is a few milliseconds of timing, not anything the player chose.
+
+Since 21 October 2026 the spill of a fall is remembered, and a rise that follows within
+**1000 ms** gives it back, never more than the rise:
+
+```
+spilled  = max(deficit − Δfall, 0)                      on the fall
+d'       = d − Δrise + min(spilled, Δrise)              on a rise within the window
+```
+
+A recast in two steps then ends where a recast in one step ends: the spell cost paid,
+nothing else. The give-back never exceeds what the fall threw away, so it cannot create
+magicka, and the ten-loop scenario of chapter 8 stays exact (tested: ten recasts timed on
+the expiry of a full pool each cost exactly the spell).
+
+**This is guesswork, and is labelled as such.** What is measured is the gaps of §4.9 and
+one hand swap:
+
+| gap | what it was |
+|---|---|
+| 17 ms | a recast: the cost came with the fall, and an expiry costs nothing |
+| 115 ms, 680 ms | cost with the rise: a recast in two steps, or an expiry landing just before a cast already under way. Not distinguishable from the log; to the player, the same act |
+| 700 ms | the fastest item removed and put back by hand (28 August, §4.8) |
+| 2.09 s | most likely a new cast after the buff ran out |
+
+The window has to cover the recasts, and nothing tells where recasting ends and "a new
+cast after an expiry" begins. The two ways to miss are not equal:
+
+- **too short**: a recast loses up to the whole fortification;
+- **too long**: a quick swap by hand gets back the overflow it would otherwise lose. The
+  swap becomes neutral, which is harmless.
+
+So the window leans long. 1000 ms covers every recast gap measured. It was 500 ms for a
+few hours on 21 October, before the 680 ms case was found in the same log; that value
+never reached the game.
+
+**Monitored.** Every rise that comes within 5 s of a spill writes a `RECAST WINDOW` line:
+the gap, inside or outside the window, what was given back or stays lost, and whether the
+cost came with the fall or the rise. The heartbeat carries the session totals. A log with
+recasts outside the window is the evidence for changing it.
+
+Scenarios of chapter 8, by name: **1** (full pool, activation) and **2** (half pool,
+activation) change only if a fall spilled less than a second earlier, which makes them a
+recast. **3** (full pool, expiry) is unchanged unless a rise follows within the second.
+**4** (low pool, expiry) spills nothing, so nothing changes. **5** (item on and off at a
+half pool) spills nothing; on a full pool, within a second, the round trip becomes
+neutral where it used to lose the overflow. **6** (ten loops) is unchanged, see above.
+
 ## 6. Architecture
 
 ### 6.1 Delivery form: ASI, not OBSE
@@ -1093,7 +1198,7 @@ into a net leak; the `.conf` must say so.
 
 ## 8. Acceptance criteria
 
-The mod is deemed correct when, on the same character, the following six scenarios behave
+The mod is deemed correct when, on the same character, the following seven scenarios behave
 as indicated. Each one is verifiable in the log and on screen, without the console.
 
 | # | Scenario | Expected |
@@ -1104,6 +1209,7 @@ as indicated. Each one is verifiable in the log and on screen, without the conso
 | 4 | Low pool, expiry | Current unchanged. **Never negative.** |
 | 5 | Equip then unequip a fortifying item, half-full pool | Current identical at start and end. No gain, no loss. |
 | 6 | Activation/expiry loop repeated ten times | Current strictly decreasing by the spell costs. No positive drift. |
+| 7 | Full pool, recast the fortification while it is active | Current lower by the spell cost only, whether the game swaps the effect in one step or two (§5.5). |
 
 Scenario 6 is the anti-exploit test: it would fail on any correction that handles only one
 of the two halves of the defect.
@@ -1294,8 +1400,13 @@ Whether the game refills magicka on a level-up, which would make the case harmle
 documented. UESP's Leveling and Remastered Leveling pages say nothing about it. In the
 original game a level-up only takes effect after resting in a bed
 ([UESP, Leveling](https://en.uesp.net/wiki/Oblivion:Leveling)); whether Remastered keeps
-that requirement is not stated on either page. This **must be checked at the first
-level-up**: a non-zero deficit in the log right after it means the game did not refill.
+that requirement is not stated on either page; the Remastered character sheet says "rest
+after improving your skills enough" (in-game text, French version, 21 October 2026).
+**First level-up observed**, 21 October 2026 (§4.9): after a night's rest, with the pool
+full before and after, and Intelligence unchanged, so it neither tested the blind spot
+nor settled whether a level-up refills. `[DEDUCTION]`: since a level-up comes after
+resting, the pool is usually full by then, and an Intelligence increase on a full pool
+only fills the new room, which resting would have filled anyway.
 Since 1.0.0-dev the log writes a `LEVEL UP` line with the deficit before and after
 (§10.8), so the first level-up with that build answers it.
 
@@ -1324,10 +1435,10 @@ logged on 28 August 2026 (§4.8, event 11): `+285`, corrected like any other.
 
 ### 10.5 Untested effects
 
-Measured so far: fortifications cast by the player, an enchanted ring, and, on 28
-August 2026 (§4.8), what reads as a Drain Magicka 22 and a lasting Intelligence −1. Not
-observed: potions, altars and blessings, and the level-up that permanently increases
-Intelligence.
+Measured so far: fortifications cast by the player, an enchanted ring, an item acting by
+script (the Scales of Pitiless Justice, §4.9), and, on 28 August 2026 (§4.8), what reads
+as a Drain Magicka 22 and a lasting Intelligence −1. Not observed: potions, altars and
+blessings, and a level-up that increases Intelligence.
 
 **Open design question: drains.** On the drain of §4.8 the engine did what it does for
 every change, and the mod did what it does for every change: it preserved current
@@ -1353,8 +1464,10 @@ deficit alone, would then grant the difference a second time. The measurement of
 rules this out for a combined expiry: Fortify Intelligence 100 and Fortify Magicka 100
 ending together took current magicka from 52.23 to −247.77. That is the full 300, and no
 order of applying the two with a floor gives that number. `[DEDUCTION]`: Remastered does
-not apply the floor. A **Fortify Magicka alone** expiring at a low pool, and a drain on a
-nearly empty pool, have not been measured. Since 1.0.0-dev such a case cannot go unnoticed:
+not apply the floor. Session 4 (§4.9) confirms it three times for the same expiry at a
+partial pool: vanilla would have left −65.7, −80.6 and −180.4, and the engine did not move
+the deficit. A **Fortify Magicka alone** expiring at a low pool, and a drain on a nearly
+empty pool, have not been measured. Since 1.0.0-dev such a case cannot go unnoticed:
 the log flags any decrease on which the engine raised the deficit (§6.6).
 
 What the log does not tell, and an investigation of drains would need:
@@ -1370,7 +1483,7 @@ What the log does not tell, and an investigation of drains would need:
 
 `[DEDUCTION]`: all of them go through the same modifier arrays, so the rule should apply
 as is. A level-up, on the other hand, raises the base attribute and not a modifier, and
-therefore escapes detection (§10.3). To be checked at the first level-up.
+therefore escapes detection (§10.3). The first level-up seen did not raise Intelligence.
 
 ### 10.6 Scope of the fix
 
@@ -1539,6 +1652,17 @@ array, `s+2` and `s-2` exactly where UESP puts them, and places the four −1 in
 **game** array. `[DEDUCTION]`: damage (a Damage Attribute effect, which lasts until
 restored, §4.8), on four attributes at once. A Restore Attribute effect would clear it,
 and would also be the first game-array change the fix sees.
+
+**Confirmed by session 4** (§4.9): each vampirism stage change moved exactly the stage
+bonus in the base values, on the attributes and skills UESP lists for vampirism, in two
+steps a few seconds apart. The ability bonuses are in the base values; the deduction above
+stands on that.
+
+Two consequences for the log. A change of stage, or any ability, changes several base
+values at once, so it is reported as "changed all at once" and described again rather
+than as a level-up. And the mastery letter is computed from the base value, which
+includes the ability bonus: Mysticism read "100 (Master)" at a trained 85 plus vampirism
+15. Whether the game counts the ability toward mastery is not known.
 
 Not done, and out of scope until validated: correcting a change of **base**
 Intelligence the way modifier changes are corrected, which would close the blind spot

@@ -194,6 +194,23 @@ struct BusyScope {
     ~BusyScope() { g_cost.busy += QpcNow() - start; }
 };
 
+// Recast window totals for the heartbeat, so the window can be judged over a session
+// (Corrector.h, kRecastWindowMs; docs/SPEC.md section 5.5).
+unsigned g_recastGiven = 0, g_recastMissed = 0;
+float    g_recastGivenPts = 0.0f, g_recastMissedPts = 0.0f;
+
+// " | recast window ..." for the heartbeat: session totals.
+std::string RecastText() {
+    char buf[160];
+    std::snprintf(buf, sizeof(buf),
+                  " | recast window %llu ms: given back %u (%.1f pts), outside %u "
+                  "(%.1f pts lost)",
+                  mpf::kRecastWindowMs, g_recastGiven,
+                  static_cast<double>(g_recastGivenPts), g_recastMissed,
+                  static_cast<double>(g_recastMissedPts));
+    return buf;
+}
+
 // " | own time ..." for the heartbeat, then a new window starts.
 std::string CostText() {
     const long long now = QpcNow();
@@ -719,6 +736,12 @@ void ReportOffsets() {
 // Defined after the character reader, below.
 bool EstimateMaxNow(float& out);
 
+// The last spill of the overflow, for a recast that arrives in two steps
+// (Corrector.h, kRecastWindowMs; docs/SPEC.md section 5.5).
+float              g_spilled   = 0.0f;
+unsigned long long g_spilledAt = 0;
+bool               g_spillCostOnFall = false;   // the deficit dropped with the fall
+
 void HandleTransition(const mpf::Transition& t) {
     ++g_stats.maxChanges;
 
@@ -786,9 +809,61 @@ void HandleTransition(const mpf::Transition& t) {
     }
 
     const bool allowed = g_cfg.Active() && !g_cfg.dryRun;
+
+    // A rise right after a spill is most likely the second half of a recast.
+    const unsigned long long nowMs = GetTickCount64();
+    const unsigned long long sinceSpill = nowMs - g_spilledAt;
+    const float giveBack = mpf::RecastGiveBack(g_spilled, sinceSpill, t.deltaMax);
+    const float spilledBefore = g_spilled;
+    if (t.deltaMax > 0.0f) { g_spilled = 0.0f; }   // one rise consumes the spill
+    const float tol = mpf::Tolerance(t.deltaMax, g_cfg.epsilon);
+
     const mpf::Decision d = mpf::DecideCorrection(t.deltaMax, t.deficitBefore,
                                                   t.deficitAfter, g_policy.Policy(),
-                                                  g_comp, allowed);
+                                                  g_comp, allowed, giveBack);
+
+    // Remember what a decrease spills, whether or not anything is written: a pool
+    // already full at the new maximum spills too, and that is the costly case.
+    if (t.deltaMax < 0.0f && (d.reason == mpf::DecisionReason::kApply ||
+                              d.reason == mpf::DecisionReason::kAlreadyCorrect)) {
+        g_spilled = mpf::SpilledOnDecrease(t.deltaMax, t.deficitAfter, g_comp.clampOverflow);
+        g_spilledAt = nowMs;
+        g_spillCostOnFall = t.deficitBefore - t.deficitAfter > tol;
+        if (g_spilled > 0.0f) {
+            MPF_INFO("  spilled %.2f above the new maximum; given back if the maximum "
+                     "rises again within %llu ms (a recast in two steps)",
+                     static_cast<double>(g_spilled), mpf::kRecastWindowMs);
+        }
+    }
+    // Every rise that follows a spill closely is logged, inside the window or not, so
+    // the window (a judgement, docs/SPEC.md section 5.5) can be checked against play.
+    if (t.deltaMax > 0.0f && spilledBefore > 0.0f && sinceSpill <= mpf::kRecastWatchMs) {
+        const bool costOnRise = t.deficitBefore - t.deficitAfter > tol;
+        const char* cost = g_spillCostOnFall ? "with the fall (a recast)"
+                         : costOnRise        ? "with the rise (a recast, or a cast landing "
+                                               "just after an expiry)"
+                                             : "none seen in either step";
+        const bool inside = sinceSpill <= mpf::kRecastWindowMs;
+        if (inside) {
+            ++g_recastGiven;
+            g_recastGivenPts += giveBack;
+            MPF_INFO("  RECAST WINDOW: the maximum rose %llu ms after falling, inside the "
+                     "%llu ms window. %.2f had spilled; %.2f given back. Spell cost charged "
+                     "%s. The window is a judgement, not a measurement (docs/SPEC.md "
+                     "section 5.5)",
+                     sinceSpill, mpf::kRecastWindowMs, static_cast<double>(spilledBefore),
+                     static_cast<double>(giveBack), cost);
+        } else {
+            ++g_recastMissed;
+            g_recastMissedPts += spilledBefore;
+            MPF_INFO("  RECAST WINDOW: the maximum rose %llu ms after falling, OUTSIDE the "
+                     "%llu ms window. %.2f had spilled and stays lost. Spell cost charged "
+                     "%s. If you were recasting a buff that was still active, the window "
+                     "is too short: please report this log (docs/SPEC.md section 5.5)",
+                     sinceSpill, mpf::kRecastWindowMs, static_cast<double>(spilledBefore),
+                     cost);
+        }
+    }
 
     if (d.reason != mpf::DecisionReason::kApply) {
         MPF_INFO("  DECISION: %s", mpf::ReasonText(d.reason));
@@ -1034,19 +1109,19 @@ void Heartbeat(const char* hypothesisName, float v, float mod, bool haveV) {
         MPF_INFO("alive | samples=%llu maxChanges=%llu corrected=%llu "
                  "wouldCorrect=%llu policy=%s | "
                  "hypothesis=%s | value=%.2f modifier=%.2f | watch=%llu "
-                 "rescans=%llu lost=%llu%s",
+                 "rescans=%llu lost=%llu%s%s",
                  g_stats.samples, g_stats.maxChanges, g_stats.corrected,
                  g_stats.wouldCorrect,
                  mpf::PolicyName(g_policy.Policy()),
                  hypothesisName, static_cast<double>(v), static_cast<double>(mod),
                  g_stats.watchChanges, g_stats.rescans, g_stats.instanceLost,
-                 CostText().c_str());
+                 RecastText().c_str(), CostText().c_str());
     } else {
         MPF_INFO("alive | samples=%llu | player=%s | modifier=%.2f | watch=%llu "
-                 "rescans=%llu lost=%llu | virtual calls disabled%s",
+                 "rescans=%llu lost=%llu | virtual calls disabled%s%s",
                  g_stats.samples, g_player ? "found" : "not found",
                  static_cast<double>(mod), g_stats.watchChanges, g_stats.rescans,
-                 g_stats.instanceLost, CostText().c_str());
+                 g_stats.instanceLost, RecastText().c_str(), CostText().c_str());
     }
 }
 
@@ -1320,7 +1395,8 @@ void ObserveLoop() {
                     const mpf::StatsDiff d = mpf::DiffStats(lastStats, cur);
                     if (d.wholesale) {
                         MPF_INFO("character data changed all at once (another save "
-                                 "loaded?): describing it again");
+                                 "loaded, or an ability changed, such as a vampirism "
+                                 "stage): describing it again");
                         LogCharacter(cur, ids, mod);
                     } else {
                         LogCharacterChange(d, lastStats, cur, deficitAtStats, mod);
