@@ -233,9 +233,10 @@ private:
     }
 
     // No legitimate effect moves maximum Magicka by more than this. The largest
-    // plausible single effect is a Fortify Intelligence of 100 on a character at the
-    // attribute cap, which is 200 points; a whole object being rewritten by a save
-    // load is in the thousands.
+    // transitions measured are +/-300 points, one spell combining Fortify
+    // Intelligence 100 and Fortify Magicka 100; several effects ending in the same
+    // poll add up, hence the margin. A whole object being rewritten by a save load is
+    // in the thousands. docs/SPEC.md section 6.4.
     static constexpr float kMaxPlausibleDMax = 2000.0f;
 
     int   deficitOffset_ = 0x6B8;

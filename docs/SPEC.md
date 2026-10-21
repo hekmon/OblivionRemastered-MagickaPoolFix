@@ -424,6 +424,12 @@ ruled out but exists only in a window 25 times narrower.
 level-up, altar blessing, potion or an item fortifying Luck. It is not
 a change of spell. The spell's base cost is about 1399.
 
+One constraint narrows the sources: in Remastered, Luck rises by at most 1 point per
+level-up and costs 4 virtues
+([UESP, Remastered Leveling](https://en.uesp.net/wiki/Oblivion:Remastered_Leveling)). So
++2 in 70 minutes needs two level-ups, or a level-up and another source, or a source other
+than levelling. Not yet confirmed by the player: the current Luck has to be read in game.
+
 **Three earlier claims in this document are withdrawn:**
 
 | Withdrawn claim | Why it was wrong |
@@ -569,8 +575,12 @@ Contradictory evidence (`kEngineIgnores` and `kEngineHandles` both observed) is 
 `kUnknown`, not resolved by majority: two transitions that contradict each other mean the
 model is wrong somewhere, and the safe answer to a wrong model is to stop correcting.
 
-The evidence is reset on every save reload, since a save can in principle run under a
-different game version.
+The evidence is **kept** across save reloads and re-primings. Up to 0.9.2 it was reset
+on every reload, on the grounds that a save can in principle run under a different game
+version. That was wrong and was withdrawn in 0.9.3: the evidence describes whether **this
+executable** rebases the deficit, a property of the binary that loading a save cannot
+change, and the reset only delayed the one warning that matters (`FIELD-JOURNAL.md`, long
+session of 6 August 2026).
 
 #### 5.3.4 Automatic calibration is not the shipped default
 
@@ -668,8 +678,8 @@ in `Documents` or `%APPDATA%`.
 ### 6.2 No hook
 
 The mod installs **no** virtual table detour and replaces no function. It discovers the
-`PlayerCharacter` instance, reads the four fields of chapter 3 in a loop, and in phase 2
-will write only the float `+0x06B8`.
+`PlayerCharacter` instance, reads the four fields of chapter 3 in a loop, and writes only
+the float `+0x06B8`. Versions before 0.9.1 only observed.
 
 This choice follows from §3.2 and §9.1: the virtual call that would give the max kills the
 process. Everything the mod does must fit within raw memory reads and writes from its own
@@ -696,9 +706,23 @@ them may be removed:
 1. re-prime when the player pointer is rescanned or invalidated;
 2. re-prime when a single tick changes at least 20 watched floats — a spell effect moves a
    handful, a reload dozens;
-3. rejection of any `|Δmaximum|` greater than 2000 points. The largest legitimate effect
-   is a Fortify Intelligence 100 on a character at the attribute cap, i.e. 200 points; a
-   rewritten object counts in thousands.
+3. rejection of any `|Δmaximum|` greater than 2000 points (`kMaxPlausibleDMax` in
+   `src/ModelWatch.h`), which re-primes instead of correcting. The largest transitions
+   measured are ±300 points, from one spell combining Fortify Intelligence 100 and Fortify
+   Magicka 100 (§4.1, §4.6). Several effects starting or ending in the same poll add up,
+   which is what the margin is for; a rewritten object counts in thousands.
+
+An earlier version of guard 3 gave 200 points, a lone Fortify Intelligence 100, as the
+largest legitimate effect. The measured ±300 contradicts it; the limit itself was never
+that low.
+
+`[DEDUCTION]`: a legitimate change above 2000 points would need several large effects to
+start or end within the same 16 ms poll. It would be re-primed rather than corrected,
+that is, left to vanilla behaviour once.
+
+A second limit, `fMaxDeltaGuard` (§7.2), is checked by the correction itself. At its
+default of 100000 it never triggers, because guard 3 rejects anything above 2000 first;
+it only matters if set below 2000.
 
 A re-prime triggers no correction and does not count as an event.
 
@@ -777,13 +801,15 @@ into a net leak; the `.conf` must say so.
 | `bSpillOverflow` | 1 | Clamp to 0 when the current would exceed the new max. |
 | `bFloorAtZero` | 1 | Forbid a negative current. Inoperative: chapter 5.2. |
 | `fEpsilon` | 0.01 | Constant term of the tolerance. |
-| `fMaxDeltaGuard` | 100000.0 | Beyond this, assume a reload rather than an effect. |
+| `fMaxDeltaGuard` | 100000.0 | Beyond this, refuse to correct. Inert at the default: guard 3 of §6.4 rejects anything above 2000 first. |
 
 ### 7.3 Runtime safety
 
-- `bDryRun` defaults to **1**: the mod computes and logs the correction without writing
-  it. The player switches it to 0 once they have read their log and found that the
-  verdicts match what they did in game.
+- `bDryRun` defaults to **0** since 0.9.2, once the write path had been validated in game
+  (§4.6). With `bDryRun = 1` the mod computes and logs every correction without writing
+  it, which is the first thing to set after a game update (§9.4). Earlier versions
+  defaulted to 1, and the player switched to 0 after checking the log against what they
+  had done in game.
 - No default key may conflict with the game's destructive shortcuts. `F5`, `F8` and `F9`
   are reserved for quicksave and quickload and **must never** be offered. The default
   memory dump key is `F10` (`0x79`); `F2`, `F4` and `F11` are also free.
@@ -963,16 +989,25 @@ uncapping mods. That was false in turn: these mods do not lift the **progression
 only the **usage** cap in certain formulas, and their Nexus pages say so explicitly
 (§10.7).
 
-Current position: the blind spot exists in the code but **is not reachable on this
-installation**. Base Intelligence cannot exceed 100, and any Intelligence above 100 comes
-from a Fortify effect, hence from a **modifier**, which the watcher sees and corrects
-normally. Still reachable are permanent increases below 100: level-up after a drain,
-attribute restoration, permanent blessing.
+Current position:
 
-A second argument may make the case entirely harmless: the game presumably restores
-magicka to full on a level-up, which would rebase the deficit on its own. This point has
-not been verified on Remastered and **must be verified at the first level-up**: it is enough to
-check whether the log shows a non-zero deficit right after the level-up.
+- **Unreachable at base Intelligence 100**, which is the test character's case. Base
+  Intelligence cannot exceed 100 (§10.7), so any Intelligence above 100 comes from a
+  Fortify effect, hence from a **modifier**, which the watcher sees and corrects normally.
+- **Still reachable below 100**, through a level-up that raises Intelligence. Remastered
+  allows up to 5 points on one attribute per level-up
+  ([UESP, Remastered Leveling](https://en.uesp.net/wiki/Oblivion:Remastered_Leveling)).
+  `[DEDUCTION]` from that and §3.4: a level-up moves the maximum by at most 10 points
+  without an event.
+- **Not known**: whether restoring damaged Intelligence or a permanent blessing changes the
+  base value or a modifier. Neither has been measured.
+
+Whether the game refills magicka on a level-up, which would make the case harmless, is not
+documented. UESP's Leveling and Remastered Leveling pages say nothing about it. In the
+original game a level-up only takes effect after resting in a bed
+([UESP, Leveling](https://en.uesp.net/wiki/Oblivion:Leveling)); whether Remastered keeps
+that requirement is not stated on either page. This **must be checked at the first
+level-up**: a non-zero deficit in the log right after it means the game did not refill.
 
 A neighboring case has, on the other hand, been ruled out: the **change of vampirism
 stage**. It modifies Strength, Speed and Willpower, never Intelligence or Magicka
@@ -1002,9 +1037,8 @@ observed: potions, diseases and curses that drain Intelligence, altars and bless
 Drain Magicka effects, and the level-up that permanently increases Intelligence.
 
 `[DEDUCTION]`: all of them go through the same modifier arrays, so the rule should apply
-as is. A permanent drain through level-up, on the other hand, modifies the base attribute
-and not a modifier, and could therefore escape detection. To be checked at the first
-level-up.
+as is. A level-up, on the other hand, raises the base attribute and not a modifier, and
+therefore escapes detection (§10.3). To be checked at the first level-up.
 
 ### 10.6 Scope of the fix
 
@@ -1033,11 +1067,12 @@ This distinction is decisive for this mod, and it reverses two conclusions:
 | Point | Status |
 |---|---|
 | `Δmax = 2 × ΔInt + ΔMagicka` remains valid above Intelligence 100 | **sourced**, §3.4. Neither mod touches the magicka formula, and vanilla does not saturate this term |
-| The blind spot of §10.3 on **permanent** Intelligence increases | **inactive**. These mods do not allow base Intelligence to go above 100. Any Intelligence above 100 goes through a Fortify effect, hence through a **modifier**, which the watcher sees. `[CORRECTION]` of an earlier version that declared this blind spot active |
+| The blind spot of §10.3 on **permanent** Intelligence increases | **unreachable at base Intelligence 100**, the test character's case: these mods do not allow base Intelligence to go above 100, so any Intelligence above 100 goes through a Fortify effect, hence through a **modifier**, which the watcher sees. **Still reachable below 100**, through a level-up (§10.3). `[CORRECTION]` of an earlier version that declared this blind spot active, and of one that called it inactive without that condition |
 | The cap at 100 in the spell cost equation | **lifted**, contrary to what an earlier version claimed. Mod 1846 removes it by binary patch, see §4.7.3 |
 
-Mod 1846 is, moreover, the same one targeted by `upstream-issue-1846.md`, and its sources
-are in the reference tree. It patches the game's **executable code** via `VirtualProtect`
+Mod 1846 publishes its source
+([OBSE64_Skill_Damage_Scaling_Cap_Remover](https://github.com/Baestus/OBSE64_Skill_Damage_Scaling_Cap_Remover)),
+which is what §4.7.3 quotes. It patches the game's **executable code** via `VirtualProtect`
 then `memcpy`, with no restoration on unload, whereas this mod writes only into a **data**
 field of the player instance. The two do not compete for any address.
 

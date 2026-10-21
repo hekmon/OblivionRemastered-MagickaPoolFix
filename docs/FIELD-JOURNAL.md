@@ -2143,3 +2143,57 @@ Found on the way, on the player's machine: the installed `MagickaPoolFix.asi` wa
 0.9.1, whose startup banner reads `0.9.1-dryrun - observation build, no memory writes` while
 `bDryRun = 0` and the same log shows `WRITE OK`. That banner was the defect fixed in 0.9.2
 (see above); the plugin was writing correctly.
+
+## 21 October 2026 — consistency pass on SPEC (documentation only)
+
+The specification was read against the code and the journal. No code changed except one
+comment in `src/ModelWatch.h`; the binary and the `.conf` are unchanged.
+
+### Corrected
+
+- **§7.3** said `bDryRun` defaults to 1. It has defaulted to 0 since 0.9.2 (entry of
+  6 August 2026, 18:30–18:50), as `src/Config.h` and the README say.
+- **§5.3.3** said the calibration evidence is reset on every save reload. That reset was
+  removed in 0.9.3 (long-session entry, "Design defect found, fixed in 0.9.3"). The section
+  now says the evidence is kept, and why.
+- **§6.2** still described the write as future ("in phase 2 will write").
+- **§6.4**, guard 3, and the comment on `kMaxPlausibleDMax`, justified the 2000-point limit
+  with "the largest legitimate effect is a Fortify Intelligence 100, i.e. 200 points". The
+  measured transitions are ±300 (one spell, Fortify Intelligence 100 + Fortify Magicka
+  100). The limit was always 2000; only its justification was wrong.
+- **§6.4 and §7.2**: `fMaxDeltaGuard` (default 100000) can never trigger at its default,
+  because the 2000-point check in `ModelWatch` rejects anything larger first. Now stated.
+- **§10.3 and §10.7 contradicted each other.** §10.3 called the level-up blind spot "not
+  reachable on this installation" and then listed reachable cases; §10.7 called it
+  "inactive". Both now say: unreachable at base Intelligence 100 (the test character),
+  still reachable below 100 through a level-up. Restoring damaged Intelligence and permanent
+  blessings, which §10.3 listed as reachable without a source, are now listed as unknown.
+- **§10.5** spoke of "a permanent drain through level-up", which is not a thing; it means a
+  level-up raising a base attribute.
+- **§10.7** pointed to `upstream-issue-1846.md` and to "the reference tree", neither of
+  which is in the public repository. It now links mod 1846's public source.
+
+### New sourced facts
+
+From [UESP, Remastered Leveling](https://en.uesp.net/wiki/Oblivion:Remastered_Leveling):
+
+- 12 virtues per level-up; at most 5 on one attribute and 3 attributes per level-up.
+- Luck costs 4 virtues per point and rises by **at most 1 per level-up**.
+
+Consequences:
+
+- `[DEDUCTION]`: a level-up moves the maximum by at most 10 points without an event, so
+  the §10.3 blind spot is small even where it is reachable.
+- §4.7.3: Luck 59 → 61 between 21:01 and 22:11 cannot come from a single level-up. It
+  needs two level-ups, or a level-up and another source, or a source other than levelling.
+  Still to be read in game.
+
+Neither UESP page says whether a level-up refills magicka, or whether Remastered still
+requires resting in a bed to level up. Test 5 (the first level-up) settles the first point.
+
+### Found, not fixed (needs a binary change)
+
+- The `.conf` comment on `fMaxDeltaGuard` says the plugin "resynchronises" past the limit.
+  It does not: the decision is "no action" (`DecisionReason::kImplausible`), and the
+  re-prime belongs to the 2000-point check, not to this setting.
+- The startup summary spans about twenty lines, against the rule of a one-line summary.
