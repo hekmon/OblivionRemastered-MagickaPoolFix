@@ -28,8 +28,8 @@ here comes from a log I sent back. How that works:
 
 ## The problem
 
-Nothing adjusts the deficit when the maximum changes, and nothing clamps the result. Three
-symptoms follow from that one defect:
+Nothing adjusts the deficit when the maximum changes, and, as measured, nothing clamps the
+result. Three symptoms follow from that one defect:
 
 - **Free magicka on activation.** Casting Fortify Magicka or Fortify Intelligence raises
   current magicka by the full amount. At 100/300, a +300 buff gives 400/600.
@@ -57,16 +57,16 @@ who used it. UESP documents the free magicka as a mechanic players use on purpos
 chaining", which allows "the player to cast the same spell infinitely"
 ([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making#Spell_Chaining)). With
 the fix, free magicka on activation is gone, and so are the exploits that rely on negative
-magicka. Regeneration and restore effects become
-what refills the pool, and regeneration grows with the square of Willpower:
+magicka. Regeneration and restore effects become what refills the pool, and regeneration
+grows with the square of Willpower:
 `2 x (W/50)^2 + 1.5 x (W/50)` per second, so 11.00 /s at Willpower 100, 22.50 /s at 150 and
 38.00 /s at 200, halved in combat. That is the formula of UESP's Willpower page, the one the
 measurement confirms; two other UESP pages give different ones
 ([UESP, Willpower](https://en.uesp.net/wiki/Oblivion:Willpower); [`docs/SPEC.md`](docs/SPEC.md)
-sections 3.3 and 10.7). `[DEDUCTION]`: for a mage relying on
-fortify spells, fortifying Willpower is the main lever on that cost.
+sections 3.3 and 10.7). `[DEDUCTION]`: for a mage relying on fortify spells, fortifying
+Willpower is the main lever on that cost.
 
-`iPreset = 1` keeps vanilla behaviour except for the floor at zero. It is not
+`iPreset = 1` keeps vanilla behavior except for the floor at zero. It is not
 balance-neutral: the free magicka is still granted, and the debt it leaves at expiry is
 forgiven ([`docs/SPEC.md`](docs/SPEC.md) section 4.4).
 
@@ -90,13 +90,6 @@ matter:
 
 Their source code was also this plugin's starting point; see [Credits](#credits).
 
-My view is that those two mods and this one are fixes, not rebalances. The game lets a mage
-push attributes and skills far past 100 through spells and enchantments, then either clamps
-them at 100 in its formulas or, for magicka, moves the maximum without rebasing the pool.
-The end-game mage looks like a case the game was not thought through for, or not played
-long enough with. That is an opinion: whether the designers meant any of it is not
-documented.
-
 Neither mod lets a *base* skill or attribute level past 100. Neither touches maximum
 magicka or regeneration either: 1846's source hooks only the cost formula, and 2068's
 README describes the damage formula only. Those two did not need uncapping. Intelligence
@@ -104,23 +97,31 @@ above 100 already adds 2 magicka per point in the base game
 ([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making)), and regeneration
 was measured following an effective Willpower of 110, not a capped 100
 ([`docs/SPEC.md`](docs/SPEC.md) section 3.3). `[DEDUCTION]`: since neither mod touches
-regeneration, that is the base game's behaviour. Details and sources:
+regeneration, that is the base game's behavior. Details and sources:
 [`docs/SPEC.md`](docs/SPEC.md) sections 4.7.3 and 10.7.
 
-The result is a magicka pool that swings by hundreds of points every time a buff is cast or
-expires. On the test character, one Fortify Intelligence 100 + Fortify Magicka 100 spell
-takes maximum magicka from 320 to 620 for 55 seconds, then back, and is recast over and
-over. That is where the engine's bookkeeping defect, harmless on a +10 ring, becomes the
-main thing happening to the magicka bar:
+In the base game, such a build means a magicka pool that swings by hundreds of points every
+time a buff is cast or expires. On the test character, one Fortify Intelligence 100 +
+Fortify Magicka 100 spell takes maximum magicka from 320 to 620 for 55 seconds, then back,
+and is recast over and over. That is where the engine's bookkeeping defect, harmless on a
++10 ring, becomes the main thing happening to the magicka bar. Measured on what the engine
+alone does, before any correction:
 
-- the buff refills the pool for free when it starts, so the spell more than pays for itself
-  (measured: 320 before casting a spell that costs 270, 350 after);
-- when it ends at a low pool, the pool goes deeply negative (measured: 52 becomes -247.77)
-  and stays unusable until regeneration climbs back through the overdraft.
+- the buff refills the pool for free when it starts, so the spell more than pays for itself:
+  320 before casting a spell that costs 270, 350 after;
+- when it ends at a low pool, the pool goes deeply negative, 52 becoming -247.77, and stays
+  unusable until regeneration climbs back through the overdraft.
 
-So the fix matters most for builds like this one. It does the same thing for any change of
-maximum magicka, from a +10 ring to a potion, but the size of the problem scales with the
-size of the swing.
+So this plugin matters most for builds like this one. It does the same thing for any change
+of maximum magicka, from a +10 ring to a potion, but the size of the problem scales with
+the size of the swing.
+
+My view is that those two mods and this one are fixes, not rebalances. The game lets a mage
+push attributes and skills far past 100 through spells and enchantments, then either clamps
+them at 100 in its formulas or, for magicka, moves the maximum without rebasing the pool.
+The end-game mage looks like a case the game was not thought through for, or not played
+long enough with. That is an opinion: whether the designers meant any of it is not
+documented.
 
 ## How it works
 
@@ -135,13 +136,13 @@ delta = 2 x delta(Intelligence) + delta(Magicka)
 which holds above Intelligence 100 too
 ([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making)). On each transition
 it writes `deficit' = min(deficit - delta, 0)`, then reads it back. That one rule covers the
-three cases: the pool keeps its water when the glass grows, keeps it when the glass
-shrinks above the water line, and is left full when the water no longer fits.
+three cases: the water stays when the glass grows, stays when the glass shrinks but its
+rim is still above the water, and the glass is left full when the water no longer fits.
 
 The rule is relative, so it is only right if the game did not already adjust the deficit
 itself. That was measured on the build above: it does not. The plugin keeps checking
 anyway. Changes that cost nothing at the moment they happen (a buff expiring, an enchanted
-item equipped or removed) show the game's own behaviour, and each one is compared with that
+item equipped or removed) show the game's own behavior, and each one is compared with that
 assumption. If a game update ever fixes the bug, the log says so in capitals, because the
 plugin would then be subtracting the change twice. `iEnginePolicy` controls this; see
 [`docs/SPEC.md`](docs/SPEC.md) section 5.
@@ -157,20 +158,24 @@ any Windows dependency and covered by host unit tests that replay the measured t
   writes, no failure, no error line, no crash. Current magicka was preserved across every
   change of maximum, to within one frame of regeneration. Four transitions would otherwise
   have left the pool below zero, down to -202.98, for 641.35 points of cumulative
-  overdraft; on the way up, 2,120 points of free magicka were refused. An Intelligence ring
+  overdraft; on the way up, 2,120 points of free magicka were refused. An enchanted ring
   behaves exactly like a spell, and reloading a save is handled.
 - **28 August 2026**: 1 h 37 min, 17 transitions, 10 writes, no failure. It added a cast at
-  95 % magnitude with armor worn, an item swap, and what reads as a Drain Magicka.
+  95 % magnitude, the spell-effectiveness cap when armor is worn, an item swap, and what
+  reads as a Drain Magicka.
 
 Every number is in [`docs/SPEC.md`](docs/SPEC.md), sections 4.6 to 4.8. Since 0.9.1 the
-correction itself has not changed, only the calibration bookkeeping, the `.conf` text and
-the log. The development version, 1.0.0-dev, makes the log describe the game build, the
+correction itself has not changed, only the calibration bookkeeping, the `.conf` (its text,
+and it is never overwritten any more) and the log. The development version, 1.0.0-dev, makes the log describe the game build, the
 loaded mods and the character from its first lines; it has not been run in game yet.
 
 **Open:**
 
 - **Not yet tested in game**: removing a Fortify Intelligence/Magicka item at a partial
-  pool, ten activation/expiry loops in a row, potions, altars and blessings, levelling up.
+  pool, ten activation/expiry loops in a row, a Fortify Magicka alone expiring at a low pool
+  (UESP describes a floor at zero for the original game, which would make the correction
+  overshoot; [`docs/SPEC.md`](docs/SPEC.md) section 10.5), potions, altars and blessings,
+  leveling up, and the character data of 1.0.0-dev.
 - **A design question**: the fix cancels a drain's effect on current magicka. Whether it
   should is open ([`docs/SPEC.md`](docs/SPEC.md) section 10.5).
 
@@ -231,9 +236,10 @@ Players should use the Nexus release. A test build is for checking a change in g
    **Put exactly one copy in exactly one folder.** A copy in two scanned folders is loaded
    twice; a single-instance mutex stops the second one and the log names the duplicate.
 3. Launch the game once. `MagickaPoolFix.conf` and `MagickaPoolFix.log` are created **next
-   to the .asi**. The plugin never overwrites an existing `.conf`, so replace it along with
-   the `.asi` when its text has changed. If that folder is not writable, the log falls back
-   to `%TEMP%\MagickaPoolFix.log` and says so.
+   to the .asi**. The plugin never overwrites an existing `.conf`, not even one it cannot
+   read (it says why in the log and runs on the defaults), so replace it along with the
+   `.asi` when its text has changed. If that folder is not writable, the log falls back to
+   `%TEMP%\MagickaPoolFix.log` and says so.
 4. The `.conf` documents every option in place. Everything a regular player needs is above
    the `A D V A N C E D` banner.
 
@@ -266,7 +272,7 @@ The first lines are what a bug report needs:
 
 1. a one-line summary: version, `ACTIVE` or `DRY RUN`, build time, the game executable and
    its PE timestamp (and whether it is the validated build), preset, engine policy, and
-   whether the `.conf` was found;
+   what happened to the `.conf` (found, created, or why neither);
 2. the loaders and mods in the game process, each with the PE timestamp of its file;
 3. the settings that differ from the defaults;
 4. once a save is loaded, the character: level, base attributes and skills with their
@@ -314,7 +320,7 @@ src/
   Corrector.h              engine-policy calibration + the write decision, no Windows dependency
   HypothesisCalibrator.h   current-versus-maximum resolver, no Windows dependency
   ModelWatch.h             watches the modifier totals, reports each transition
-  PlayerStats.h            the character data in the log, change detection, path anonymisation
+  PlayerStats.h            the character data in the log, change detection, path anonymization
   PeUtil.h                 PE section walk, committed-page snapshot, checked reads and writes
   Rtti.h                   MSVC RTTI walk: mangled name -> locator -> vtable
   Probe.h                  hex dump, float watch, edge-triggered key
@@ -375,7 +381,7 @@ cmake --build build-tests && ctest --test-dir build-tests --output-on-failure
 ```
 
 An MSVC build is a different compiler and runtime from the release binary. Its in-game
-behaviour is not covered by the validation above; use the CI artifact or `build.sh` for
+behavior is not covered by the validation above; use the CI artifact or `build.sh` for
 anything you report.
 
 ### Without a toolchain
