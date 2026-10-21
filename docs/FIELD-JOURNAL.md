@@ -2627,3 +2627,29 @@ now neutral; the 28 August swap (0.7 s) lost 20 then and would not now.
 Built: 223 OK (33 new: give-back, field replays of 21:34, 21:36, 21:46 and 22:45, the
 28 August swap, ten recasts at expiry), 0 FAIL, 0 warnings, imports unchanged, `.conf`
 byte-identical. Not run in game.
+
+## 21 October 2026 — a log for players, Debug for us
+
+The maintainer found the default level too heavy for a player: session 4 wrote 758
+lines, about 600 of them from 42 transitions at roughly 15 lines each. Agreed:
+
+- **Default level**: the startup lines, a shorter character block (level, attributes,
+  estimated magicka), **one line per change of maximum** (what changed and from which
+  arrays, the pool before, as the game left it and after, the outcome, a recast
+  give-back), level-ups and base value changes, the player lost or found, and anything
+  that needs attention. The heartbeat says whether the player is found, the deficit, and
+  how many changes were seen and corrected.
+- **Debug**: the full transition block, calibration evidence, decisions, writes, skill
+  lines and skill-ups, the recast window inside the window, the plugin's own time.
+- A `RECAST WINDOW` rise outside the window stays at the default level, as an Info line
+  rather than an error: it is a request to report a log, not a fault.
+- **Test sessions run at `iLevel = 3`** (AGENTS.md, SPEC §6.6). The shipped default stays 2.
+
+Estimated for session 4: about 180 lines instead of 758, most of them the status line.
+
+Also: the PARTIAL verdict text now has a version for decreases (it described only the
+self-cast increase), closing that open item, and its `switch` lists every case with no
+`default`. The `.conf` text of `iLevel` describes the new split, so the `.conf` changed:
+replace it with the `.asi`.
+
+Built: 227 OK, 0 FAIL, 0 warnings, imports unchanged. Not run in game.

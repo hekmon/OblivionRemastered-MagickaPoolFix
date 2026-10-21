@@ -58,6 +58,7 @@ struct Transition {
     float deltaMag    = 0.0f;
     float deficitBefore = 0.0f; // deficit one tick before the change
     float deficitAfter  = 0.0f; // deficit as the engine left it
+    MaxChangeBehaviour verdict = MaxChangeBehaviour::kPartial;
 };
 
 class ModelWatch {
@@ -113,18 +114,18 @@ public:
         const MaxChangeBehaviour verdict =
             ClassifyMaxChange(dMax, dMod, mod_, eps_);
 
-        MPF_INFO("MODELWATCH event %d ---------------------------------------------",
+        MPF_DBG("MODELWATCH event %d ---------------------------------------------",
                  events_);
-        MPF_INFO("  Intelligence modifier total : %10.4f -> %10.4f  (delta %+.4f)",
+        MPF_DBG("  Intelligence modifier total : %10.4f -> %10.4f  (delta %+.4f)",
                  static_cast<double>(int_), static_cast<double>(intTotal),
                  static_cast<double>(dInt));
-        MPF_INFO("  Magicka modifier total      : %10.4f -> %10.4f  (delta %+.4f)",
+        MPF_DBG("  Magicka modifier total      : %10.4f -> %10.4f  (delta %+.4f)",
                  static_cast<double>(mag_), static_cast<double>(magTotal),
                  static_cast<double>(dMag));
-        MPF_INFO("  predicted change in maximum : %+.4f  (= 2 x %+.4f %+.4f)",
+        MPF_DBG("  predicted change in maximum : %+.4f  (= 2 x %+.4f %+.4f)",
                  static_cast<double>(dMax), static_cast<double>(dInt),
                  static_cast<double>(dMag));
-        MPF_INFO("  deficit at +0x%03X           : %10.4f -> %10.4f  (delta %+.4f)",
+        MPF_DBG("  deficit at +0x%03X           : %10.4f -> %10.4f  (delta %+.4f)",
                  deficitOffset_, static_cast<double>(mod_),
                  static_cast<double>(modifier), static_cast<double>(dMod));
         // A self-cast fortification pays for itself in the same transition that raises
@@ -142,17 +143,17 @@ public:
         // predicted change in maximum of +300 gives 270 if the engine compensated
         // nothing, and -30 if it compensated in full. The second is impossible, so this
         // build does not compensate -- established from the ambiguous transition itself.
-        MPF_INFO("  deficit if preserved        : %10.4f  (observed %10.4f)",
+        MPF_DBG("  deficit if preserved        : %10.4f  (observed %10.4f)",
                  static_cast<double>(mod_ - dMax), static_cast<double>(modifier));
-        MPF_INFO("  implied spell cost if the engine compensated nothing : %10.4f",
+        MPF_DBG("  implied spell cost if the engine compensated nothing : %10.4f",
                  static_cast<double>(-dMod));
-        MPF_INFO("  implied spell cost if the engine compensated in full : %10.4f%s",
+        MPF_DBG("  implied spell cost if the engine compensated in full : %10.4f%s",
                  static_cast<double>(-dMod - dMax),
                  (-dMod - dMax) < -eps_ ? "  <-- negative, impossible, so the engine "
                                           "did NOT compensate" : "");
-        MPF_INFO("  pool before the change      : %s",
+        MPF_DBG("  pool before the change      : %s",
                  std::fabs(mod_) <= eps_ ? "FULL (deficit zero)" : "NOT full");
-        MPF_INFO("  VERDICT: %s", Describe(verdict));
+        MPF_DBG("  VERDICT: %s", Describe(verdict, dMax > 0.0f));
 
         t.valid         = true;
         t.deltaMax      = dMax;
@@ -160,6 +161,7 @@ public:
         t.deltaMag      = dMag;
         t.deficitBefore = mod_;
         t.deficitAfter  = modifier;
+        t.verdict       = verdict;
 
         int_ = intTotal; mag_ = magTotal; mod_ = modifier;
         return t;
@@ -177,14 +179,14 @@ public:
     void Discontinuity(const char* why) {
         if (!primed_) { return; }
         primed_ = false;
-        MPF_INFO("MODELWATCH re-priming after a discontinuity (%s)", why);
+        MPF_DBG("MODELWATCH re-priming after a discontinuity (%s)", why);
     }
 
     int Events() const { return events_; }
 
     // The classification itself lives in MagickaMath.h, which builds and is unit
     // tested off Windows; this only turns a verdict into prose.
-    static const char* Describe(MaxChangeBehaviour v) {
+    static const char* Describe(MaxChangeBehaviour v, bool increase) {
         switch (v) {
         case MaxChangeBehaviour::kPreserved:
             return "pool PRESERVED -- the deficit moved by exactly minus the change "
@@ -206,15 +208,23 @@ public:
                    "decrease although there was no overflow to spill. This is the "
                    "bug, and it is the half that drives the pool negative when a "
                    "fortify expires.";
-        default:
+        case MaxChangeBehaviour::kPartial:
+            if (increase) {
+                return "PARTIAL -- the deficit moved, but by neither zero nor minus the "
+                       "change in maximum. On an increase this is the ordinary shape "
+                       "when you cast the fortification on yourself: the engine charges "
+                       "the spell in the same transition that raises your maximum, so "
+                       "the movement mixes the two. The 'implied spell cost' lines above "
+                       "separate them: a negative cost is impossible, since no spell "
+                       "refunds Magicka, so whichever hypothesis produces one is refuted.";
+            }
             return "PARTIAL -- the deficit moved, but by neither zero nor minus the "
-                   "change in maximum. On an INCREASE this is the ordinary shape when "
-                   "you cast the fortification on yourself, because the engine charges "
-                   "the spell in the same transition that raises your maximum, so the "
-                   "movement mixes the two. The 'implied spell cost' lines below "
-                   "separate them: a negative cost is impossible, since no spell "
-                   "refunds Magicka, so whichever hypothesis produces one is refuted.";
+                   "change in maximum. On a decrease this is a spell cast in the same "
+                   "poll (a recast, docs/SPEC.md section 5.5), regeneration over a "
+                   "small change, or another effect landing at once. The decision "
+                   "below does not depend on the verdict.";
         }
+        return "?";
     }
 
     void SetDeficitOffset(int off) { deficitOffset_ = off; }
@@ -224,7 +234,7 @@ private:
         int_ = intTotal; mag_ = magTotal; mod_ = modifier;
         primed_ = true;
         if (!announce) { return; }
-        MPF_INFO("MODELWATCH primed: Intelligence modifier total %.4f, Magicka "
+        MPF_DBG("MODELWATCH primed: Intelligence modifier total %.4f, Magicka "
                  "modifier total %.4f, deficit %.4f (pool %s). Cast a Fortify "
                  "Intelligence or Fortify Magicka spell to test the model.",
                  static_cast<double>(int_), static_cast<double>(mag_),

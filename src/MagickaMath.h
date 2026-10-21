@@ -142,6 +142,18 @@ enum class MaxChangeBehaviour {
     kPartial
 };
 
+// The verdict as a short tag, for the one-line transition summary.
+inline const char* VerdictName(MaxChangeBehaviour v) {
+    switch (v) {
+    case MaxChangeBehaviour::kPreserved:       return "PRESERVED";
+    case MaxChangeBehaviour::kSpilledFromFull: return "OVERFLOW SPILLED";
+    case MaxChangeBehaviour::kFreeMagicka:     return "FREE MAGICKA";
+    case MaxChangeBehaviour::kLostMagicka:     return "MAGICKA STOLEN";
+    case MaxChangeBehaviour::kPartial:         return "PARTIAL";
+    }
+    return "?";
+}
+
 // Multiplier from a point of Intelligence to a point of maximum Magicka. Base
 // Magicka is Intelligence times two plus flat race and birthsign bonuses, so the
 // derivative with respect to Intelligence is exactly 2 and the flat bonuses cancel

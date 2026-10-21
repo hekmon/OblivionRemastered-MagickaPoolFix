@@ -624,6 +624,21 @@ int main()
     TestFieldCases();
     TestEngineMoveWarning();
     TestRecast();
+    std::printf("\n-- short texts for the one-line summary ---------------------------\n");
+    {
+        const auto chk = [](const char* name, const char* got, const char* want) {
+            const bool ok = std::string(got) == want;
+            if (!ok) ++g_fail;
+            std::printf("%-66s got=%-18s want=%-18s %s\n", name, got, want, ok ? "OK" : "FAIL");
+        };
+        chk("reason: apply", mpf::ReasonShort(mpf::DecisionReason::kApply), "corrected");
+        chk("reason: already correct", mpf::ReasonShort(mpf::DecisionReason::kAlreadyCorrect),
+            "nothing to do");
+        chk("verdict: free magicka", mpf::VerdictName(mpf::MaxChangeBehaviour::kFreeMagicka),
+            "FREE MAGICKA");
+        chk("verdict: stolen", mpf::VerdictName(mpf::MaxChangeBehaviour::kLostMagicka),
+            "MAGICKA STOLEN");
+    }
     std::printf("\n%s\n", g_fail == 0 ? "all corrector tests passed"
                                       : "THERE WERE FAILURES");
     return g_fail == 0 ? 0 : 1;

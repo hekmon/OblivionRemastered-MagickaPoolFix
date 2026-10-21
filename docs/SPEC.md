@@ -1120,14 +1120,34 @@ player's first spell, or even indefinitely.
   posted publicly does not carry the Windows account name. Paths inside the game folder
   are written relative to it.
 - A periodic heartbeat on **a single line**, every 60 seconds by default, which is a
-  floor and not an indicative value.
-- Every max transition produces a readable block: the two modifier totals before and
+  floor and not an indicative value. At the default level it says whether the player is
+  found, the deficit, and how many changes were seen and corrected; at `iLevel = 3` a
+  second line adds the counters, the recast window totals (§5.5) and the plugin's own
+  time.
+- **Two levels for each transition** (since 21 October 2026; before that, everything
+  below was written at the default level, about 15 lines per transition). At the default
+  level, **one line**: the change of maximum with its Intelligence and Magicka parts and
+  the arrays they came from, the estimated pool before, as the game left it and after the
+  correction, the outcome, and a recast give-back if any. For example:
+
+  ```
+  MAX -300 (Int -100, Magicka -100; magic) | pool 234 / 622, the game left -66 / 322, now 234 / 322 | corrected
+  ```
+
+  At `iLevel = 3`, the readable block before it: the two modifier totals before and
   after, the predicted `Δmaximum` with its calculation, the deficit before and after,
-  the value the deficit would have under preservation, the fill state before, and the
-  verdict.
-- The "deficit under preservation" line is essential for diagnosis: it is what separates
+  the value the deficit would have under preservation, the implied spell costs, the fill
+  state before, the verdict, the calibration evidence and the decision.
+- **What stays at the default level** whatever happens: level-ups, base value changes,
+  the player being lost or found, `ENGINE MOVED THE DEFICIT`, `WRITE FAILED`, a
+  contradiction with the engine policy, and a `RECAST WINDOW` rise outside the window
+  (§5.5), which asks to be reported. Skill-ups, the skill lines of the character block and
+  the recast lines inside the window are Debug.
+- **Test sessions run at `iLevel = 3`.** The shipped default stays 2, for players.
+- The "deficit under preservation" line (Debug) is essential for diagnosis: it is what separates
   a spell's cost from compensation, as in §4.2.
-- Since 1.0.0-dev each transition also says which source moved, as the change of the
+- Since 1.0.0-dev each transition also says which source moved (Debug; the one-line
+  summary names the arrays), as the change of the
   Intelligence and Magicka modifiers in the magic, script and game arrays. A spell or an
   enchantment lands in the magic array, a script in the script array, the engine's own
   adjustments in the game array.

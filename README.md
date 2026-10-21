@@ -289,12 +289,21 @@ The first lines are what a bug report needs:
    what happened to the `.conf` (found, created, or why neither);
 2. the loaders and mods in the game process, each with the PE timestamp of its file;
 3. the settings that differ from the defaults;
-4. once a save is loaded, the character: level, base attributes and skills with their
-   modifier totals (`PLAYER` lines).
+4. once a save is loaded, the character: level, base attributes with their modifiers,
+   and the estimated magicka (`PLAYER` lines).
 
-After that, each change of maximum produces a `DECISION` line, and every write is followed
-by `WRITE OK` or `WRITE FAILED`. Level-ups, base attribute changes and skill-ups get a line
-each. A status line is written at most once a minute. Paths are written with the user's
+After that, each change of maximum gets one line: what changed, the pool before, as the
+game left it and after the fix, and what the plugin did:
+
+```
+MAX -300 (Int -100, Magicka -100; magic) | pool 234 / 622, the game left -66 / 322, now 234 / 322 | corrected
+```
+
+Level-ups, base attribute changes, and anything that needs attention (`WRITE FAILED`,
+`ENGINE MOVED THE DEFICIT`, a recast outside the window) get a line each. A status line is
+written at most once a minute. With `iLevel = 3` the log also writes the full detail of
+each change, the skills and skill-ups, and the plugin's own cost: use it when testing or
+reporting a problem. Paths are written with the user's
 profile folder replaced by `%USERPROFILE%`.
 
 ## Compatibility

@@ -316,10 +316,12 @@ fMaxDeltaGuard = 100000.0
 ; 0 = Off, 1 = Error only, 2 = Info, 3 = Debug, 4 = Trace (one line per frame).
 ;
 ; Level 2 starts with a one-line summary, the loaded mods and the character
-; (level, attributes, skills), then logs only actual changes, never per-frame
-; state. Level 3 adds the startup details (configuration, game sections, every
-; loaded module, discovery) and the memory dumps of the probe. Level 4 is for
-; short diagnostic sessions only - it is bounded by iMaxLines below.
+; (level, attributes, estimated magicka), then writes one line per change of
+; maximum magicka, plus level-ups and anything that needs your attention.
+; Level 3 adds the detail of every change, skills and skill-ups, the plugin's
+; own cost, and the startup details (configuration, game sections, every loaded
+; module, discovery, memory dumps). Use 3 when testing or reporting a problem.
+; Level 4 is for short diagnostic sessions only - it is bounded by iMaxLines.
 iLevel = 2
 
 ; Log file name, created next to the .asi file. Truncated at every game start;

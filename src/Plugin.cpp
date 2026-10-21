@@ -106,6 +106,20 @@ static bool TotalAvModifier(std::uintptr_t obj, int avIndex, float& out) {
 // first step in reading an unexpected change, a drain for instance (SPEC §10.5).
 struct AvSources { float intel[3]; float magicka[3]; };
 
+// Which arrays moved, as "magic", "script", "magic+game"..., for the one-line summary.
+std::string SourceTag(const AvSources& before, const AvSources& after) {
+    static const char* const kName[3] = {"magic", "script", "game"};
+    std::string tag;
+    for (int i = 0; i < 3; ++i) {
+        const float di = after.intel[i] - before.intel[i];
+        const float dm = after.magicka[i] - before.magicka[i];
+        if (std::fabs(di) < 0.005f && std::fabs(dm) < 0.005f) { continue; }
+        if (!tag.empty()) { tag += '+'; }
+        tag += kName[i];
+    }
+    return tag;
+}
+
 void LogSourceBreakdown(const AvSources& before, const AvSources& after) {
     std::string line;
     auto add = [&line](const char* name, const float b[3], const float a[3]) {
@@ -119,7 +133,7 @@ void LogSourceBreakdown(const AvSources& before, const AvSources& after) {
     };
     add("Intelligence", before.intel, after.intel);
     add("Magicka", before.magicka, after.magicka);
-    MPF_INFO("  change by source (magic / script / game): %s", line.c_str());
+    MPF_DBG("  change by source (magic / script / game): %s", line.c_str());
 }
 int            g_vtblGet  = 0;   // resolved GetActorFloatValue index
 
@@ -742,7 +756,7 @@ float              g_spilled   = 0.0f;
 unsigned long long g_spilledAt = 0;
 bool               g_spillCostOnFall = false;   // the deficit dropped with the fall
 
-void HandleTransition(const mpf::Transition& t) {
+void HandleTransition(const mpf::Transition& t, const std::string& sources) {
     ++g_stats.maxChanges;
 
     // Current and maximum, estimated, so a log shows whether the pool went below zero
@@ -751,7 +765,7 @@ void HandleTransition(const mpf::Transition& t) {
     const bool haveMax = EstimateMaxNow(maxNow);
     if (haveMax) {
         const float maxBefore = maxNow - t.deltaMax;
-        MPF_INFO("  estimated magicka current/max: before %.1f / %.1f, as the engine left "
+        MPF_DBG("  estimated magicka current/max: before %.1f / %.1f, as the engine left "
                  "it %.1f / %.1f",
                  static_cast<double>(maxBefore + t.deficitBefore),
                  static_cast<double>(maxBefore),
@@ -776,7 +790,7 @@ void HandleTransition(const mpf::Transition& t) {
     // policy is by definition unambiguous, so it is also correctable, and there is no
     // reason to make the player wait for a second one.
     if (g_policy.Observe(t.deficitBefore, t.deltaMax, t.deficitAfter)) {
-        MPF_INFO("  OBSERVED: this change cost nothing at the moment it happened, so the "
+        MPF_DBG("  OBSERVED: this change cost nothing at the moment it happened, so the "
                  "deficit movement is the game's own behaviour. Evidence now: %d for "
                  "\"ignores\", %d for \"handles\". The game appears to: %s",
                  g_policy.IgnoreEvidence(), g_policy.HandleEvidence(),
@@ -822,6 +836,47 @@ void HandleTransition(const mpf::Transition& t) {
                                                   t.deficitAfter, g_policy.Policy(),
                                                   g_comp, allowed, giveBack);
 
+    // The one line a player's log carries for this transition (iLevel 2). The detail
+    // above and below it is Debug.
+    const bool insideWindow = giveBack > 0.0f &&
+                              (d.reason == mpf::DecisionReason::kApply ||
+                               d.reason == mpf::DecisionReason::kAlreadyCorrect);
+    auto summary = [&](const char* outcome, float finalDeficit) {
+        char pool[160];
+        if (haveMax) {
+            const float maxBefore = maxNow - t.deltaMax;
+            const float cur0 = maxBefore + t.deficitBefore;
+            const float curGame = maxNow + t.deficitAfter;
+            const float curNow = maxNow + finalDeficit;
+            if (std::fabs(finalDeficit - t.deficitAfter) > 0.005f) {
+                std::snprintf(pool, sizeof(pool),
+                              "pool %.0f / %.0f, the game left %.0f / %.0f, now %.0f / %.0f",
+                              static_cast<double>(cur0), static_cast<double>(maxBefore),
+                              static_cast<double>(curGame), static_cast<double>(maxNow),
+                              static_cast<double>(curNow), static_cast<double>(maxNow));
+            } else {
+                std::snprintf(pool, sizeof(pool), "pool %.0f / %.0f, now %.0f / %.0f",
+                              static_cast<double>(cur0), static_cast<double>(maxBefore),
+                              static_cast<double>(curNow), static_cast<double>(maxNow));
+            }
+        } else {
+            std::snprintf(pool, sizeof(pool),
+                          "deficit %.1f, the game left %.1f, now %.1f",
+                          static_cast<double>(t.deficitBefore),
+                          static_cast<double>(t.deficitAfter),
+                          static_cast<double>(finalDeficit));
+        }
+        char recast[96] = "";
+        if (insideWindow) {
+            std::snprintf(recast, sizeof(recast), "; recast, %llu ms after a fall: %.0f given back",
+                          sinceSpill, static_cast<double>(giveBack));
+        }
+        MPF_INFO("MAX %+.0f (Int %s, Magicka %s%s%s) | %s | %s%s",
+                 static_cast<double>(t.deltaMax), mpf::FormatModifier(t.deltaInt).c_str(),
+                 mpf::FormatModifier(t.deltaMag).c_str(), sources.empty() ? "" : "; ",
+                 sources.c_str(), pool, outcome, recast);
+    };
+
     // Remember what a decrease spills, whether or not anything is written: a pool
     // already full at the new maximum spills too, and that is the costly case.
     if (t.deltaMax < 0.0f && (d.reason == mpf::DecisionReason::kApply ||
@@ -830,7 +885,7 @@ void HandleTransition(const mpf::Transition& t) {
         g_spilledAt = nowMs;
         g_spillCostOnFall = t.deficitBefore - t.deficitAfter > tol;
         if (g_spilled > 0.0f) {
-            MPF_INFO("  spilled %.2f above the new maximum; given back if the maximum "
+            MPF_DBG("  spilled %.2f above the new maximum; given back if the maximum "
                      "rises again within %llu ms (a recast in two steps)",
                      static_cast<double>(g_spilled), mpf::kRecastWindowMs);
         }
@@ -847,7 +902,7 @@ void HandleTransition(const mpf::Transition& t) {
         if (inside) {
             ++g_recastGiven;
             g_recastGivenPts += giveBack;
-            MPF_INFO("  RECAST WINDOW: the maximum rose %llu ms after falling, inside the "
+            MPF_DBG("  RECAST WINDOW: the maximum rose %llu ms after falling, inside the "
                      "%llu ms window. %.2f had spilled; %.2f given back. Spell cost charged "
                      "%s. The window is a judgement, not a measurement (docs/SPEC.md "
                      "section 5.5)",
@@ -856,7 +911,7 @@ void HandleTransition(const mpf::Transition& t) {
         } else {
             ++g_recastMissed;
             g_recastMissedPts += spilledBefore;
-            MPF_INFO("  RECAST WINDOW: the maximum rose %llu ms after falling, OUTSIDE the "
+            MPF_INFO("RECAST WINDOW: the maximum rose %llu ms after falling, OUTSIDE the "
                      "%llu ms window. %.2f had spilled and stays lost. Spell cost charged "
                      "%s. If you were recasting a buff that was still active, the window "
                      "is too short: please report this log (docs/SPEC.md section 5.5)",
@@ -866,20 +921,22 @@ void HandleTransition(const mpf::Transition& t) {
     }
 
     if (d.reason != mpf::DecisionReason::kApply) {
-        MPF_INFO("  DECISION: %s", mpf::ReasonText(d.reason));
+        MPF_DBG("  DECISION: %s", mpf::ReasonText(d.reason));
+        summary(mpf::ReasonShort(d.reason), t.deficitAfter);
         return;
     }
 
     ++g_stats.wouldCorrect;
-    MPF_INFO("  DECISION: %s at +0x%03X, %.4f -> %.4f (%+.4f), which puts current "
+    MPF_DBG("  DECISION: %s at +0x%03X, %.4f -> %.4f (%+.4f), which puts current "
              "Magicka back where it was before the maximum moved",
              mpf::ReasonText(d.reason), static_cast<unsigned>(g_offMod),
              static_cast<double>(t.deficitAfter), static_cast<double>(d.newDeficit),
              static_cast<double>(d.deltaApplied));
 
     if (!allowed) {
-        MPF_INFO("  DRY RUN: nothing was written. Set bDryRun = 0 in the .conf to let "
+        MPF_DBG("  DRY RUN: nothing was written. Set bDryRun = 0 in the .conf to let "
                  "the plugin apply this.");
+        summary("dry run, would correct", t.deficitAfter);
         return;
     }
 
@@ -890,6 +947,7 @@ void HandleTransition(const mpf::Transition& t) {
                   "the page is not writable or because the game overwrote it in the "
                   "same frame. No further attempt is made for this change.",
                   static_cast<unsigned long long>(addr));
+        summary("WRITE FAILED", t.deficitAfter);
         return;
     }
 
@@ -899,13 +957,14 @@ void HandleTransition(const mpf::Transition& t) {
     g_model.NoteDeficitWrite(d.newDeficit);
     ++g_stats.corrected;
     if (haveMax) {
-        MPF_INFO("  WRITE OK: +0x%03X now reads %.4f, estimated magicka %.1f / %.1f",
-                 static_cast<unsigned>(g_offMod), static_cast<double>(d.newDeficit),
-                 static_cast<double>(maxNow + d.newDeficit), static_cast<double>(maxNow));
+        MPF_DBG("  WRITE OK: +0x%03X now reads %.4f, estimated magicka %.1f / %.1f",
+                static_cast<unsigned>(g_offMod), static_cast<double>(d.newDeficit),
+                static_cast<double>(maxNow + d.newDeficit), static_cast<double>(maxNow));
     } else {
-        MPF_INFO("  WRITE OK: +0x%03X now reads %.4f", static_cast<unsigned>(g_offMod),
-                 static_cast<double>(d.newDeficit));
+        MPF_DBG("  WRITE OK: +0x%03X now reads %.4f", static_cast<unsigned>(g_offMod),
+                static_cast<double>(d.newDeficit));
     }
+    summary("corrected", d.newDeficit);
 }
 
 // --------------------------------------------------------------------------
@@ -1031,10 +1090,10 @@ void LogCharacter(const mpf::BaseStats& s, const CharacterIds& ids, float defici
                           mpf::MasteryName(s.skill[i])[0]);
             line += buf;
         }
-        MPF_INFO("PLAYER %s skills base/modifier: %s", kGroup[g], line.c_str());
+        MPF_DBG("PLAYER %s skills base/modifier: %s", kGroup[g], line.c_str());
     }
 
-    MPF_INFO("PLAYER derived modifiers: Health %s, Magicka %s, Fatigue %s, Encumbrance %s",
+    MPF_DBG("PLAYER derived modifiers: Health %s, Magicka %s, Fatigue %s, Encumbrance %s",
              ModifierOf(mpf::kAV_Health).c_str(), ModifierOf(mpf::kAV_Magicka).c_str(),
              ModifierOf(mpf::kAV_Fatigue).c_str(), ModifierOf(mpf::kAV_Encumbrance).c_str());
     float maxNow = 0.0f;
@@ -1097,7 +1156,7 @@ void LogCharacterChange(const mpf::StatsDiff& d, const mpf::BaseStats& a,
                           mpf::MasteryName(b.skill[i]));
             skills += buf;
         }
-        MPF_INFO("SKILL UP %s", skills.c_str());
+        MPF_DBG("SKILL UP %s", skills.c_str());
     }
     if (d.readyChanged) {
         MPF_INFO("READY TO LEVEL UP: %s", b.readyToLevelUp ? "yes" : "no");
@@ -1117,11 +1176,17 @@ void Heartbeat(const char* hypothesisName, float v, float mod, bool haveV) {
                  g_stats.watchChanges, g_stats.rescans, g_stats.instanceLost,
                  RecastText().c_str(), CostText().c_str());
     } else {
-        MPF_INFO("alive | samples=%llu | player=%s | modifier=%.2f | watch=%llu "
-                 "rescans=%llu lost=%llu | virtual calls disabled%s%s",
-                 g_stats.samples, g_player ? "found" : "not found",
-                 static_cast<double>(mod), g_stats.watchChanges, g_stats.rescans,
-                 g_stats.instanceLost, RecastText().c_str(), CostText().c_str());
+        // Info: is it alive, does it see the player, how much did it do. The rest,
+        // including its own cost and the recast window totals, is for Debug.
+        const std::string cost = CostText();   // also starts a new measuring window
+        MPF_INFO("alive | player %s | deficit %.2f | %llu changes of maximum, %llu "
+                 "corrected, %llu write failures",
+                 g_player ? "found" : "not found", static_cast<double>(mod),
+                 g_stats.maxChanges, g_stats.corrected, g_stats.writeFailed);
+        MPF_DBG("  samples=%llu watch=%llu rescans=%llu lost=%llu | virtual calls "
+                "disabled%s%s",
+                g_stats.samples, g_stats.watchChanges, g_stats.rescans,
+                g_stats.instanceLost, RecastText().c_str(), cost.c_str());
     }
 }
 
@@ -1355,7 +1420,8 @@ void ObserveLoop() {
                 const mpf::Transition t = g_model.Feed(intTotal, magTotal, mod);
                 if (t.valid) {
                     if (haveSources) { LogSourceBreakdown(lastSources, src); }
-                    HandleTransition(t);
+                    HandleTransition(t, haveSources ? SourceTag(lastSources, src)
+                                                    : std::string());
                 }
                 lastSources = src;
                 haveSources = true;

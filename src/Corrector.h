@@ -395,6 +395,22 @@ inline const char* PolicyName(EnginePolicy p)
     return "?";
 }
 
+// The decision as a few words, for the one-line transition summary.
+inline const char* ReasonShort(DecisionReason r)
+{
+    switch (r) {
+    case DecisionReason::kApply:             return "corrected";
+    case DecisionReason::kInactive:          return "not corrected (plugin inactive)";
+    case DecisionReason::kNoChange:          return "nothing to do (no real change)";
+    case DecisionReason::kImplausible:       return "not corrected (implausible change)";
+    case DecisionReason::kDirectionDisabled: return "not corrected (direction off in the .conf)";
+    case DecisionReason::kAlreadyCorrect:    return "nothing to do";
+    case DecisionReason::kEngineHandlesIt:   return "not corrected (the game handles it)";
+    case DecisionReason::kNeedsCalibration:  return "not corrected (engine policy not settled)";
+    }
+    return "?";
+}
+
 inline const char* ReasonText(DecisionReason r)
 {
     switch (r) {

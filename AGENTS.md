@@ -53,6 +53,8 @@ that changes what ships, what is public, or the game install.
 
 - One file next to the `.asi`, truncated at every start, **never rotated**.
 - Startup summary on **one line**. Periodic status no more often than **every 60 s**.
+- The default level (`iLevel = 2`) is for players: **one line per change of maximum**,
+  plus what needs attention. Detail goes to Debug (`docs/SPEC.md` section 6.6).
 
 ### Keys
 
@@ -120,6 +122,7 @@ After every change:
 ## In-game testing
 
 - **One change per session**, so each log has one explanation.
+- Test sessions run at **`iLevel = 3`** (Debug) in the maintainer's `.conf`.
 - The maintainer backs up their saves before every session. Every result needs a log.
 - First check of every session: the log's first lines show the PE timestamp `0xF19077A4`,
   `ACTIVE`, then the player being found. If the timestamp differs, stop and set
