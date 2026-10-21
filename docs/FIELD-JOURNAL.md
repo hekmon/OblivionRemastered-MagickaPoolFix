@@ -2197,3 +2197,75 @@ requires resting in a bed to level up. Test 5 (the first level-up) settles the f
   It does not: the decision is "no action" (`DecisionReason::kImplausible`), and the
   re-prime belongs to the 2000-point check, not to this setting.
 - The startup summary spans about twenty lines, against the rule of a one-line summary.
+
+## 21 October 2026 — 1.0.0-dev: a log that describes itself (built, not yet run in game)
+
+Version scheme from here: `1.0.0-dev` until the 1.0.0 release, with builds told apart by
+the build time on the log's first line.
+
+### Why
+
+The plugin is about to be public. From then on, a log from someone else's machine is all
+a bug report will carry, so its first lines have to say what the game build is, what is
+loaded, what was changed in the `.conf`, and what the character looks like. Until now the
+startup was about 500 lines (configuration, game sections, 142 modules, RTTI details, two
+hex dumps of the player object), with no level, attributes or skills anywhere.
+
+### What changed in the log
+
+- **Line 1 is a summary**:
+  - version, `ACTIVE` or `DRY RUN`, build time;
+  - the game executable and its PE timestamp, with "(validated build)" or "(NOT the
+    validated build)";
+  - preset, engine policy, conf state.
+
+  It is written before the 2 s wait, and the PE header is read through `ReadMem`. If the
+  build is not `0xF19077A4` and the plugin would write, an error line says to set
+  `bDryRun = 1` first.
+- **One line of loaders and mods**: every module outside the Windows folder, relative to
+  the game folder when inside it, with its own PE timestamp. That identifies a mod's build
+  without `VERSION.dll`, which the import rule forbids and which is the very file an ASI
+  loader usually stands in for.
+- **One line of non-default settings.**
+- **The character block**, once a save is loaded:
+  - level, ready-to-level-up flag, race, class and birthsign form IDs;
+  - base health, spell points and fatigue;
+  - the 8 attributes and 21 skills, base value and modifier total, with the mastery letter
+    of each skill.
+
+  Then **`LEVEL UP`**, **`BASE VALUES CHANGED`**, **`SKILL UP`** and **`READY TO LEVEL UP`**
+  lines during play. Each carries the magicka deficit before and after, so the first
+  level-up answers SPEC §10.3. Offsets and sources: `docs/SPEC.md` §10.8.
+- Everything else from startup moved to `iLevel = 3`.
+- Paths: the user's profile folder is written as `%USERPROFILE%`.
+- Stale log string removed: the offsets report still said "not read from your binary.
+  Confirming them is this build's job", from the probe builds.
+
+### Found on the way
+
+- commonlibob64's `ActorValue.h` puts Magicka at 8. The plugin's mapping (Magicka 9) was
+  set from the field dump of 6 August and agrees with the CS wiki "Stats List", which is
+  now the cited source for the indices in `src/PCH.h`.
+- The `.conf` described preset 1 (Vanilla+) as "Zero balance impact". SPEC §7.1 requires
+  the opposite: keeping the free magicka and forgiving the debt at expiry is a net gain
+  (§4.4). Corrected.
+- The `.conf` banner still said "turn the dry run off", and the `fMaxDeltaGuard` comment
+  said "resynchronises". Both corrected (see the previous entry for the second).
+
+### Status
+
+Built with MinGW-w64: unit tests 176 OK (41 new, `tests/test_stats.cpp`), 0 FAIL,
+0 warnings, imports KERNEL32, msvcrt, USER32. **Not run in game.** Every character value
+is `[DEDUCTION]` until a log is compared with the character sheet.
+
+### Pending
+
+The installed `MagickaPoolFix.log` is a 0.9.1 session from 28 August 2026, 21:02–22:39,
+not analysed yet. It has 17 events and 10 `WRITE OK`, 0 `WRITE FAILED`, 0 error lines.
+Seen at a glance:
+- event 1 is a +300 cast from a full pool that leaves the deficit at exactly −266.0000, so a
+  cost of 266 against 268 on 6 August;
+- the Intelligence modifier baseline is 12 instead of 10;
+- event 15 has a `MAGICKA STOLEN` verdict.
+
+The other casts were not from a full pool, so their costs still have to be worked out.

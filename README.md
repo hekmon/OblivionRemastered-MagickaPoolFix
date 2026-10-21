@@ -183,8 +183,10 @@ magicka were refused. Enchanted items are covered: an Intelligence ring behaves 
 like a spell and is handled by the same rule. Reloading a save is handled: the plugin
 notices, re-primes, and finds the player object again.
 
-Since 0.9.1 only the documentation, the calibration bookkeeping and the `.conf` text have
-changed. Every number is in [`docs/SPEC.md`](docs/SPEC.md), sections 4.6 and 4.7.
+Since 0.9.1 the correction itself has not changed: only the calibration bookkeeping, the
+`.conf` text and the log. The current development version, 1.0.0-dev, adds the startup
+summary and the character data to the log; it has not been run in game yet. Every number is
+in [`docs/SPEC.md`](docs/SPEC.md), sections 4.6 and 4.7.
 
 **Not yet tested in game:** removing a Fortify Intelligence/Magicka item at a partial pool,
 ten activation/expiry loops in a row, potions, Drain Intelligence/Magicka, altars and
@@ -279,8 +281,10 @@ being read against the scenario. [`AGENTS.md`](AGENTS.md) has the procedure.
 
 ## Releasing
 
-1. Bump `MPF_PLUGIN_VERSION` in `src/PCH.h` whenever the binary changes, including any
-   text the plugin writes (the `.conf` and log strings). CMake reads the version from there.
+1. `MPF_PLUGIN_VERSION` in `src/PCH.h` is the only version number; CMake reads it from
+   there. Until 1.0.0 it stays `1.0.0-dev`, and each build is identified by its build time,
+   printed on the log's first line. After 1.0.0, bump it whenever the binary changes,
+   including any text the plugin writes (the `.conf` and log strings).
 2. `./build.sh`, then `./tools/package.sh`. `dist/` only ever holds the current zip.
 3. Add a dated entry to [`docs/FIELD-JOURNAL.md`](docs/FIELD-JOURNAL.md).
 4. Tag `v<version>`. For `v*` tags, GitHub Actions checks that the tag matches
@@ -332,9 +336,21 @@ confirmed on the Steam build. Game Pass is untested.
 opened with `FILE_SHARE_DELETE`, so you can delete or rename it at any time, even while the
 game is running.
 
-The first line says whether the run is `ACTIVE` or `DRY RUN`. After that, each change of
-maximum produces a `DECISION` line, and every write is followed by `WRITE OK` or
-`WRITE FAILED`. A status line is written at most once a minute.
+The first lines are what a bug report needs:
+
+1. a one-line summary: version, `ACTIVE` or `DRY RUN`, build time, the game executable and
+   its PE timestamp (and whether it is the validated build), preset, engine policy, and
+   whether the `.conf` was found;
+2. the loaders and mods in the game process, each with the PE timestamp of its file;
+3. the settings that differ from the defaults;
+4. once a save is loaded, the character: level, base attributes and skills with their
+   modifier totals (`PLAYER` lines, not yet validated in game: [`docs/SPEC.md`](docs/SPEC.md)
+   section 10.8).
+
+After that, each change of maximum produces a `DECISION` line, and every write is followed
+by `WRITE OK` or `WRITE FAILED`. Level-ups, base attribute changes and skill-ups get a line
+each. A status line is written at most once a minute. `iLevel = 3` adds the full startup
+detail. Paths are written with the user's profile folder replaced by `%USERPROFILE%`.
 
 ## Compatibility
 

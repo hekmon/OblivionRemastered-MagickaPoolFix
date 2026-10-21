@@ -114,7 +114,11 @@ if(MPF_BUILD_TESTS)
     target_include_directories(test_corrector PRIVATE src)
     add_test(NAME corrector COMMAND test_corrector)
 
-    foreach(t test_math test_calibration test_corrector)
+    add_executable(test_stats tests/test_stats.cpp)
+    target_include_directories(test_stats PRIVATE src)
+    add_test(NAME stats COMMAND test_stats)
+
+    foreach(t test_math test_calibration test_corrector test_stats)
         if(MSVC)
             target_compile_options(${t} PRIVATE /W4)
         else()

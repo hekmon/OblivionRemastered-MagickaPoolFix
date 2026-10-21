@@ -20,7 +20,11 @@
 #include <cstring>
 
 #define MPF_PLUGIN_NAME    "MagickaPoolFix"
-#define MPF_PLUGIN_VERSION "0.9.7"
+#define MPF_PLUGIN_VERSION "1.0.0-dev"
+
+// The game build every offset was confirmed on (docs/SPEC.md chapter 3). The log
+// says on its first line whether the running game is this build.
+#define MPF_VALIDATED_GAME_TIMESTAMP 0xF19077A4u
 
 // On x64 the MS calling convention is the default for both MSVC and mingw-w64
 // targeting Windows. __fastcall is a no-op on MSVC x64 and triggers an "attribute
@@ -33,7 +37,10 @@
 
 namespace mpf {
 
-// ActorValue indices, from commonlibob64 RE/A/ActorValue.h.
+// ActorValue indices, from the CS wiki "Stats List" (Strength 0 .. Luck 7,
+// Health 8, Magicka 9, Fatigue 10, Encumbrance 11, skills Armorer 12 .. Speechcraft
+// 32), which the field dump below confirms. commonlibob64's RE/A/ActorValue.h puts
+// Magicka at 8, which that dump contradicts, so it is not used for indices.
 enum : std::int32_t {
     kAV_Strength     = 0,
     kAV_Intelligence = 1,

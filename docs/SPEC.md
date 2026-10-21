@@ -745,6 +745,23 @@ player's first spell, or even indefinitely.
 - File next to the `.asi`, truncated at startup. **No rotation**: an ordinary player will
   not come and clean up rotation files, and cluttering their installation folder is
   unacceptable.
+- The log opens with a **one-line summary**:
+  - plugin version, `ACTIVE` or `DRY RUN`, build time;
+  - the game executable and its PE timestamp, and whether that is the validated build
+    (`0xF19077A4`); if it is not and the plugin would write, an error line follows;
+  - preset, engine policy, and whether the `.conf` was found or created.
+- At the default level, the summary is followed by:
+  - one line listing the loaders and mods (every module outside the Windows folder),
+    each with the PE timestamp of its own file;
+  - one line of the settings that differ from the shipped defaults;
+  - once a save is loaded, the character block of §10.8.
+
+  The rest of the startup detail (configuration dump, game sections, the full module
+  list, discovery, the probe's memory dumps) is written at `iLevel = 3`. A bug report
+  then carries, in its first lines, everything needed to read the rest.
+- Paths are written with the user's profile folder replaced by `%USERPROFILE%`, so a log
+  posted publicly does not carry the Windows account name. Paths inside the game folder
+  are written relative to it.
 - A periodic heartbeat on **a single line**, every 60 seconds by default, which is a
   floor and not an indicative value.
 - Every max transition produces a readable block: the two modifier totals before and
@@ -1008,6 +1025,8 @@ original game a level-up only takes effect after resting in a bed
 ([UESP, Leveling](https://en.uesp.net/wiki/Oblivion:Leveling)); whether Remastered keeps
 that requirement is not stated on either page. This **must be checked at the first
 level-up**: a non-zero deficit in the log right after it means the game did not refill.
+Since 1.0.0-dev the log writes a `LEVEL UP` line with the deficit before and after
+(§10.8), so the first level-up with that build answers it.
 
 A neighboring case has, on the other hand, been ruled out: the **change of vampirism
 stage**. It modifies Strength, Speed and Willpower, never Intelligence or Magicka
@@ -1091,6 +1110,73 @@ Formula and halving in combat from
 skills, conversely, brings almost nothing more on cost: the hyperbolic branch of
 mod 1846 gives `0.2 × 100 / S`, i.e. 19.3% of the base cost at `S = 103.6` and still 14.97%
 at `S = 133.6`. The return decreases as `1/S`.
+
+### 10.8 Character data in the log (not yet validated)
+
+Since 1.0.0-dev the log describes the character: level, base attributes, base skills,
+and the modifier totals of each. It also writes a line when the level, a base attribute
+or a base skill changes during play. Nothing here feeds the correction; it is there so
+that a log from another player's machine can be read without asking them for their
+character sheet, and so that a level-up documents itself (§10.3).
+
+The values are read from memory, never written, through the same checked reads as the
+rest (§9.2):
+
+| Field | Where | Type |
+|---|---|---|
+| player form ID, must be `0x14` | `PlayerCharacter + 0x10` | u32 |
+| base form (`TESNPC`) | `PlayerCharacter + 0x50` | pointer |
+| base form ID, must be `0x07` | `TESNPC + 0x10` | u32 |
+| base spell points, fatigue, **level** | `TESNPC + 0x54`, `+0x56`, `+0x5A` | u16, u16, i16 |
+| base health | `TESNPC + 0xF0` | u32 |
+| **base attributes**, Strength to Luck | `TESNPC + 0x100` | u8 ×8 |
+| race | `TESNPC + 0x1B0` | form pointer |
+| **base skills**, Armorer to Speechcraft | `TESNPC + 0x1B8` | u8 ×21 |
+| class | `TESNPC + 0x1D0` | form pointer |
+| ready to level up | `PlayerCharacter + 0x41C` | bool |
+| birthsign | `PlayerCharacter + 0x928` | form pointer |
+
+Sources:
+
+- The `PlayerCharacter` offsets come from commonlibob64 (`PlayerCharacter.h`,
+  `TESObjectREFR.h`, `OBJ_REFR.h`, `TESForm.h`).
+- The `TESNPC` offsets are `[DEDUCTION]`. They are summed from the declared sizes of
+  `TESActorBase`'s base components in commonlibob64, assuming MSVC places each one at
+  8-byte alignment. One cross-check holds: `TESActorBase` (0x1A8) plus `TESRaceForm`
+  (0x10) lands exactly on `NPC_DATA` at 0x1B8, the offset `TESNPC.h` declares.
+- The field order and sizes match the `NPC_` record format on UESP: `ACBS` holds flags,
+  base spell points, fatigue, barter gold, level, calcMin and calcMax; `DATA` holds the
+  21 skills, health and the 8 attributes
+  ([UESP, NPC_ record](https://en.uesp.net/wiki/Oblivion_Mod:Mod_File_Format/NPC_)).
+- Form IDs `0x14` (player reference) and `0x07` (player base NPC):
+  [UESP, Player](https://en.uesp.net/wiki/Oblivion:Player) and
+  [CS wiki, Player](https://cs.uesp.net/wiki/Player).
+- Actor-value order, used for the modifier totals and the skill names:
+  [CS wiki, Stats List](https://cs.uesp.net/wiki/Stats_List). It agrees with the field
+  dump of §3.4. commonlibob64's `ActorValue.h` puts Magicka at 8 instead of 9; that
+  enumeration contradicts the dump and is not used.
+- Mastery follows the **base** skill (Novice below 25, Apprentice, Journeyman, Expert,
+  Master at 100), and Fortify effects do not unlock perks
+  ([UESP, Skills](https://en.uesp.net/wiki/Oblivion:Skills)).
+
+Before any field is trusted, the player's form ID, the base form's form ID and the base
+form's vtable (`TESNPC`, found through RTTI) are checked. If a check fails, the log says
+which one and the character block is skipped.
+
+A change is reported as one game event only if it looks like one. A Remastered level-up
+raises the level by one and at most 3 attributes
+([UESP, Remastered Leveling](https://en.uesp.net/wiki/Oblivion:Remastered_Leveling)), and
+a skill rises a few points at most between two samples 250 ms apart. Anything larger,
+or any value going down, is treated as another save being loaded: the block is written
+again rather than reported as progress.
+
+**Validation still to do**, once, in game: compare the `PLAYER` lines with the character
+sheet (level, the 8 attributes, a few skills including Restoration). Until that is done,
+every value in those lines is `[DEDUCTION]`.
+
+Not done, and out of scope until validated: correcting a change of **base**
+Intelligence the way modifier changes are corrected, which would close the blind spot
+of §10.3. The log only reports it.
 
 ## 11. Three method errors not to repeat
 

@@ -21,7 +21,7 @@ WARN="-Wall -Wextra -Wpedantic"
 mkdir -p build
 
 echo "== unit tests (host)"
-for t in math calibration corrector; do
+for t in math calibration corrector stats; do
     "$CXXHOST" -std=c++20 $WARN -I src -o "build/test_$t" "tests/test_$t.cpp"
     "./build/test_$t"
 done

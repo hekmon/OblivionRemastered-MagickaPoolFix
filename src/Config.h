@@ -232,9 +232,11 @@ R"CONF(; =======================================================================
 ;
 ;   1 = Vanilla+
 ;       Keeps vanilla behaviour, including free Magicka on activation, but
-;       never lets current Magicka go below zero. Zero balance impact.
-;       Spell-chaining still works. Pick this if you just want the -200/300
-;       state gone.
+;       never lets current Magicka go below zero. Pick this if you just want
+;       the -200/300 state gone. It is NOT balance-neutral: the free Magicka is
+;       still granted when a buff starts, and the debt it leaves when the buff
+;       ends is forgiven, so chaining fortify spells becomes a net Magicka gain
+;       (docs/SPEC.md section 4.4).
 ;
 ;   2 = Glass  (default)
 ;       The full model described above. Current Magicka is preserved when the
@@ -287,8 +289,9 @@ bFloorAtZero = 1
 fEpsilon = 0.01
 
 ; Safety rail. A maximum-Magicka change larger than this is assumed to be a
-; save load or a game state reset rather than a spell, so the plugin
-; resynchronises instead of "compensating" a bogus delta.
+; save load or a game state reset rather than a spell, and is left
+; uncorrected. Changes above 2000 points are already refused before this
+; check, so the default never triggers; it only matters if set lower.
 fMaxDeltaGuard = 100000.0
 
 
@@ -296,9 +299,11 @@ fMaxDeltaGuard = 100000.0
 
 ; 0 = Off, 1 = Error only, 2 = Info, 3 = Debug, 4 = Trace (one line per frame).
 ;
-; Level 2 logs startup details and then only actual changes, never per-frame
-; state. Level 3 adds the hypothesis-calibration events. Level 4 is for short
-; diagnostic sessions only - it is bounded by iMaxLines below.
+; Level 2 starts with a one-line summary, the loaded mods and the character
+; (level, attributes, skills), then logs only actual changes, never per-frame
+; state. Level 3 adds the startup details (configuration, game sections, every
+; loaded module, discovery) and the memory dumps of the probe. Level 4 is for
+; short diagnostic sessions only - it is bounded by iMaxLines below.
 iLevel = 2
 
 ; Log file name, created next to the .asi file. Truncated at every game start;
@@ -320,8 +325,8 @@ iMaxLines = 200000
 ;      A D V A N C E D   --   Y O U   C A N   S T O P   R E A D I N G   H E R E
 ;
 ;   Everything above this line is what a player is expected to touch: pick a
-;   preset, turn the dry run off, and you are done. The defaults below are the
-;   right ones for normal play and nothing below changes how Magicka behaves.
+;   preset and you are done. The defaults below are the right ones for normal
+;   play and nothing below changes how Magicka behaves.
 ;
 ;   What follows is diagnostic and reverse-engineering machinery: a memory
 ;   probe, a hex dumper, a float watcher, and hand-pinned memory offsets. It
@@ -701,6 +706,71 @@ inline const char* PresetName(Preset p) {
     case Preset::Custom:      return "3 Custom ([Magicka] is read)";
     }
     return "?";
+}
+
+// Every setting whose value in use differs from the shipped default, as
+// "key=value" pairs, or "none". One line in the log tells a bug report reader
+// what this player changed, without the whole configuration dump.
+inline std::string NonDefaultSettings(const Config& c) {
+    const Config d{};
+    std::string out;
+    char buf[96];
+    auto add = [&out](const char* text) {
+        if (!out.empty()) { out += ", "; }
+        out += text;
+    };
+    auto i = [&](const char* key, long v, long dv) {
+        if (v == dv) { return; }
+        std::snprintf(buf, sizeof(buf), "%s=%ld", key, v);
+        add(buf);
+    };
+    auto h = [&](const char* key, int v, int dv) {
+        if (v == dv) { return; }
+        std::snprintf(buf, sizeof(buf), "%s=0x%X", key, static_cast<unsigned>(v));
+        add(buf);
+    };
+    auto f = [&](const char* key, float v, float dv) {
+        if (v == dv) { return; }
+        std::snprintf(buf, sizeof(buf), "%s=%g", key, static_cast<double>(v));
+        add(buf);
+    };
+    auto b = [&](const char* key, bool v, bool dv) { i(key, v ? 1 : 0, dv ? 1 : 0); };
+
+    i("iPreset", static_cast<long>(c.preset), static_cast<long>(d.preset));
+    b("bDryRun", c.dryRun, d.dryRun);
+    b("bPreserveOnIncrease", c.preserveOnIncrease, d.preserveOnIncrease);
+    b("bPreserveOnDecrease", c.preserveOnDecrease, d.preserveOnDecrease);
+    b("bSpillOverflow", c.spillOverflow, d.spillOverflow);
+    b("bFloorAtZero", c.floorAtZero, d.floorAtZero);
+    f("fEpsilon", c.epsilon, d.epsilon);
+    f("fMaxDeltaGuard", c.maxDeltaGuard, d.maxDeltaGuard);
+    i("iLevel", static_cast<long>(c.logLevel), static_cast<long>(d.logLevel));
+    if (c.logFile != d.logFile) {
+        std::snprintf(buf, sizeof(buf), "sFile=%.80s", c.logFile.c_str());
+        add(buf);
+    }
+    i("iHeartbeatSeconds", c.heartbeatSeconds, d.heartbeatSeconds);
+    i("iMaxLines", c.maxLines, d.maxLines);
+    b("bEnabled", c.probeEnabled, d.probeEnabled);
+    b("bDumpOnKeyPress", c.dumpOnKeyPress, d.dumpOnKeyPress);
+    h("iDumpKey", c.dumpKey, d.dumpKey);
+    h("iDumpFrom", c.dumpFrom, d.dumpFrom);
+    h("iDumpTo", c.dumpTo, d.dumpTo);
+    b("bModuleInventory", c.moduleInventory, d.moduleInventory);
+    b("bHeapScan", c.heapScan, d.heapScan);
+    b("bFloatWatch", c.floatWatch, d.floatWatch);
+    b("bCallVirtuals", c.callVirtuals, d.callVirtuals);
+    i("iPollIntervalMs", c.pollIntervalMs, d.pollIntervalMs);
+    h("iMagickaModifier", c.offMagickaModifier, d.offMagickaModifier);
+    h("iMagicAVModifiers", c.offMagicAVModifiers, d.offMagicAVModifiers);
+    h("iScriptAVModifiers", c.offScriptAVModifiers, d.offScriptAVModifiers);
+    h("iGameAVModifiers", c.offGameAVModifiers, d.offGameAVModifiers);
+    h("iUpdateVtableIndex", c.vtblUpdate, d.vtblUpdate);
+    h("iGetActorFloatValue", c.vtblGetActorFloat, d.vtblGetActorFloat);
+    i("iForceHypothesis", c.forceHypothesis, d.forceHypothesis);
+    i("iEnginePolicy", c.enginePolicy, d.enginePolicy);
+    i("iPolicyConfirmations", c.policyConfirmations, d.policyConfirmations);
+    return out.empty() ? std::string("none") : out;
 }
 
 }  // namespace mpf

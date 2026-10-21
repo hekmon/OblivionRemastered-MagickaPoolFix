@@ -104,9 +104,11 @@ After every change:
 
 1. `./build.sh`. It must end with every unit test OK and 0 FAIL, `conf check OK`, and the
    three allowed imports, with 0 compiler warnings.
-2. If the binary changes, including any string the plugin writes to the log or the `.conf`,
-   bump `MPF_PLUGIN_VERSION` in `src/PCH.h`, the version's only home (CMake reads it from
-   there). Comment-only changes do not need a bump.
+2. `MPF_PLUGIN_VERSION` in `src/PCH.h` is the version's only home (CMake reads it from
+   there). Until the 1.0.0 release it stays `1.0.0-dev`: builds are told apart by the build
+   time on the log's first line. From 1.0.0 on, bump it whenever the binary changes,
+   including any string the plugin writes to the log or the `.conf`; comment-only changes
+   do not need a bump.
 3. If the build changes, keep `CMakeLists.txt` in step with `build.sh`: same flags, same
    outputs. CI builds both.
 4. `./tools/package.sh`. `dist/` holds only the current zip.

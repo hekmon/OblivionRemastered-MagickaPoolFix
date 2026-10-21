@@ -129,7 +129,7 @@ public:
         if (!primed_) {
             values_ = std::move(now);
             primed_ = true;
-            MPF_INFO("FLOATWATCH primed: %zu floats in 0x%X..0x%X (%s)",
+            MPF_DBG("FLOATWATCH primed: %zu floats in 0x%X..0x%X (%s)",
                      values_.size(), from_, to_, reason);
             return 0;
         }
