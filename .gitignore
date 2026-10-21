@@ -30,5 +30,4 @@ MagickaPoolFix.conf
 Thumbs.db
 
 # Work files
-.translate/
 __pycache__/

@@ -2,8 +2,8 @@
 # Package a release: dist/MagickaPoolFix-<version>.zip, containing the plugin, its
 # default .conf, the docs and the full source, plus a SHA256SUMS covering every file.
 #
-# Run ./build.sh first. Any previous zip in dist/ is removed, so dist/ only ever
-# holds the current release.
+# Run ./build.sh first, from a git checkout. Any previous zip in dist/ is removed,
+# so dist/ only ever holds the current release.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,9 +19,10 @@ rm -rf dist
 mkdir -p "$stage"
 
 cp build/MagickaPoolFix.asi build/MagickaPoolFix.conf "$stage/"
-cp README.md SPEC.md FIELD-JOURNAL.md LICENSE upstream-issue-1846.md \
-   CMakeLists.txt build.sh "$stage/"
-cp -r src tests cmake tools "$stage/"
+# Source and docs: every file git tracks, as it is in the working tree, minus the
+# repository plumbing (.github/, .gitignore, .gitattributes). Untracked files, such
+# as drafts kept out of the repository, never reach a release.
+git ls-files -z -- . ':!:.*' | xargs -0 cp --parents -t "$stage/"
 
 (cd "$stage" && find . -type f ! -name SHA256SUMS | LC_ALL=C sort | xargs sha256sum > SHA256SUMS)
 (cd dist && zip -qr "$name.zip" "$name")

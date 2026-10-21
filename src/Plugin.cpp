@@ -24,9 +24,9 @@
 //     and discarding non-finite values.
 //
 //   * Calling the game's virtual GetActorFloatValue (bCallVirtuals) is off and
-//     must stay off: on the tested build it hangs or faults (SPEC.md section 9.1).
+//     must stay off: on the tested build it hangs or faults (docs/SPEC.md section 9.1).
 //
-// See SPEC.md for the full model and the sources behind every number.
+// See docs/SPEC.md for the full model and the sources behind every number.
 
 #include "PCH.h"
 

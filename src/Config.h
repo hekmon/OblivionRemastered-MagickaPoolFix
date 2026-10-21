@@ -8,7 +8,7 @@
 // implications and the URLs of its sources. Since an ASI plugin has no console,
 // this is the main channel for explaining anything to the player.
 //
-// Decision (SPEC.md section 9.1): the [Magicka] section is only read when
+// Decision (docs/SPEC.md section 7.1): the [Magicka] section is only read when
 // iPreset = 3. There is no -1 sentinel in [Magicka] because a custom profile has
 // no reference value to fall back to; the sentinel stays legitimate in [Offsets],
 // where the reference is the compiled value, documented in a trailing comment.
@@ -33,7 +33,7 @@ enum class Preset : std::int32_t {
 struct Config {
     // [General]
     Preset preset  = Preset::Glass;
-    bool   dryRun  = false;  // the write path is validated in game; see SPEC 4.6
+    bool   dryRun  = false;  // the write path is validated in game; see docs/SPEC.md section 4.6
 
     // [Magicka] - only read when preset == Custom
     bool  preserveOnIncrease = true;
@@ -85,7 +85,7 @@ struct Config {
     bool magickaIgnored  = false;  // [Magicka] was edited while iPreset != 3
     bool heartbeatRaised = false;  // iHeartbeatSeconds < 60, raised to the floor
 
-    // Profile -> booleans resolution (SPEC.md section 7.4).
+    // Profile -> booleans resolution (docs/SPEC.md sections 7.1 and 7.2).
     CompensationConfig Resolve() const {
         CompensationConfig c;
         c.epsilon     = epsilon;

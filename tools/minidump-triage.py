@@ -1,4 +1,20 @@
+#!/usr/bin/env python3
+"""First look at a Windows minidump (.dmp), without a debugger or symbols.
+
+Prints the loaded modules, the exception record (code, address, owning module and
+RVA, PE timestamp), and for an access violation the faulting address and whether
+it lies in a module. Then scans the crashing thread's stack for words that point
+into a module: a raw scan, not an unwind, so expect false positives.
+
+This is how the virtual-call crash of 0.4.0-probe was traced to RVA 0x458F57C in
+the game executable (docs/FIELD-JOURNAL.md; docs/SPEC.md section 9.1).
+
+Usage: minidump-triage.py <file.dmp>
+"""
 import struct, sys
+
+if len(sys.argv) != 2:
+    sys.exit(__doc__.strip().splitlines()[-1])
 
 path = sys.argv[1]
 d = open(path, 'rb').read()

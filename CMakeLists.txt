@@ -1,30 +1,43 @@
-# MagickaPoolFix - build script
+# MagickaPoolFix - CMake build, for local development and IDEs.
 #
-# Produces MagickaPoolFix.asi, a plain Win64 DLL with an .asi extension, loaded by
-# an ASI loader. It is deliberately NOT an OBSE64 plugin: OBSE64 is reported as
-# unstable on this setup, and an ASI plugin has no dependency on the script
-# extender at all.
+# The reference build is ./build.sh: it is what CI runs and what releases are made
+# from. This file is the alternative for contributors who prefer CMake, an IDE, or
+# MSVC on Windows. CI builds it too (MinGW-w64 on Linux, MSVC on Windows), so it
+# cannot rot silently, but a release binary always comes from build.sh.
 #
-# Two toolchains are supported and produce a functionally identical binary:
+# It produces MagickaPoolFix.asi, a plain Win64 DLL with an .asi extension, loaded
+# by an ASI loader. It is deliberately NOT an OBSE64 plugin: OBSE64 crashes on the
+# maintainer's setup, and an ASI plugin has no dependency on a script extender.
+# When Python 3 is found, the default MagickaPoolFix.conf is generated and checked
+# next to it, as build.sh does.
 #
-#   MSVC (Windows, recommended if you have Visual Studio):
-#       cmake -B build -A x64
-#       cmake --build build --config Release
-#
-#   MinGW-w64 (cross-compiling from Linux, which is how the shipped binary was
-#   built):
-#       cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake \
+#   MinGW-w64, cross-compiling from Linux or WSL (same flags as build.sh):
+#       cmake -B build-cmake -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake \
 #             -DCMAKE_BUILD_TYPE=Release
-#       cmake --build build
+#       cmake --build build-cmake
+#
+#   MSVC, on Windows:
+#       cmake -B build-cmake -A x64
+#       cmake --build build-cmake --config Release
 #
 # The unit tests build for the host platform, not for Windows, because the
 # headers they cover (MagickaMath.h, HypothesisCalibrator.h, Corrector.h)
 # are free of any Windows dependency on purpose:
-#       cmake -B build-tests -DMPF_BUILD_TESTS=ON
+#       cmake -B build-tests -DMPF_BUILD_TESTS=ON -DMPF_BUILD_PLUGIN=OFF
 #       cmake --build build-tests && ctest --test-dir build-tests --output-on-failure
 
 cmake_minimum_required(VERSION 3.21)
-project(MagickaPoolFix VERSION 0.9.7 LANGUAGES CXX)
+
+# The version has one home, src/PCH.h. Read it from there.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/PCH.h" _mpf_version_line
+     REGEX "^#define MPF_PLUGIN_VERSION ")
+string(REGEX REPLACE "^#define MPF_PLUGIN_VERSION \"([0-9]+(\\.[0-9]+)*).*$" "\\1"
+       MPF_VERSION "${_mpf_version_line}")
+if(NOT MPF_VERSION MATCHES "^[0-9]+(\\.[0-9]+)*$")
+    message(FATAL_ERROR "cannot read MPF_PLUGIN_VERSION from src/PCH.h")
+endif()
+
+project(MagickaPoolFix VERSION ${MPF_VERSION} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -51,17 +64,35 @@ if(MPF_BUILD_PLUGIN AND WIN32)
     target_link_libraries(MagickaPoolFix PRIVATE psapi)
 
     if(MSVC)
+        target_compile_definitions(MagickaPoolFix PRIVATE UNICODE _UNICODE)
         target_compile_options(MagickaPoolFix PRIVATE /W4 /permissive- /GR /EHsc)
         # Static CRT so the plugin does not need a redistributable installed.
         set_property(TARGET MagickaPoolFix PROPERTY
                      MSVC_RUNTIME_LIBRARY "MultiThreaded")
         target_compile_options(MagickaPoolFix PRIVATE $<$<CONFIG:Release>:/MT>)
     else()
-        target_compile_options(MagickaPoolFix PRIVATE -Wall -Wextra -Wpedantic)
-        # Static libstdc++/libgcc for the same reason, and hide every symbol.
+        # Same flags as build.sh. -O2 comes after CMake's -O3 on the command line,
+        # so it wins. -municode also defines UNICODE and _UNICODE.
+        target_compile_options(MagickaPoolFix PRIVATE
+            -O2 -municode -Wall -Wextra -Wpedantic)
+        # Static libstdc++/libgcc for the same reason, strip, and hide every symbol.
         target_link_options(MagickaPoolFix PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -municode -s -static -static-libgcc -static-libstdc++
             -Wl,--exclude-all-symbols)
+    endif()
+
+    # The default .conf, generated from Config.h and checked, as build.sh does.
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_FOUND)
+        add_custom_command(TARGET MagickaPoolFix POST_BUILD
+            COMMAND Python3::Interpreter
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_conf.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/Config.h"
+                    "$<TARGET_FILE_DIR:MagickaPoolFix>/MagickaPoolFix.conf"
+            VERBATIM)
+    else()
+        message(WARNING "Python 3 not found: MagickaPoolFix.conf will not be generated "
+                        "(the plugin writes it on first launch anyway)")
     endif()
 endif()
 

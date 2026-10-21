@@ -1,6 +1,6 @@
 // PCH.h - MagickaPoolFix
 // ASI plugin for The Elder Scrolls IV: Oblivion Remastered.
-// See SPEC.md for the full specification.
+// See docs/SPEC.md for the full specification.
 
 #pragma once
 

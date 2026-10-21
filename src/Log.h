@@ -1,12 +1,12 @@
 // Log.h - MagickaPoolFix
 //
 // An ASI plugin has no console, so the log file is the only diagnostic channel.
-// Decisions taken (SPEC.md section 10):
+// Decisions taken (docs/SPEC.md section 6.6):
 //   - single file, next to the .asi;
 //   - TRUNCATED at every start, NO rotation, so the game folder never fills up
 //     with files nobody will ever clean;
 //   - written with WriteFile, NOT with stdio, and never buffered. Two reasons,
-//     both learned the hard way (SPEC.md section 9.3):
+//     both learned the hard way (docs/SPEC.md section 9.3):
 //       * FILE_SHARE_DELETE lets the player delete the log while the game runs;
 //         a C stdio handle forbids that, so a stuck game makes the file
 //         undeletable and the player cannot even tell whether it is stale.
