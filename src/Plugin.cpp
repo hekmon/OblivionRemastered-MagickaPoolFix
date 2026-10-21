@@ -1385,7 +1385,11 @@ void ObserveLoop() {
         // ---- float watch --------------------------------------------------
         int burst = 0;
         if (g_cfg.floatWatch && g_watch.Configured()) {
-            burst = g_watch.Sample(g_player, "poll", mpf::Lvl::Debug);
+            // Every float that moves, every poll: regeneration alone moves one per
+            // poll, so this is Trace. At Debug it filled the 200,000-line cap in
+            // 36 minutes (22 October 2026). The count still feeds the burst
+            // detection below at every level.
+            burst = g_watch.Sample(g_player, "poll", mpf::Lvl::Trace);
             g_stats.watchChanges += static_cast<unsigned long long>(burst);
         }
 

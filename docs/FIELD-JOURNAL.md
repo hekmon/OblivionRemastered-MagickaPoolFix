@@ -2653,3 +2653,18 @@ self-cast increase), closing that open item, and its `switch` lists every case w
 replace it with the `.asi`.
 
 Built: 227 OK, 0 FAIL, 0 warnings, imports unchanged. Not run in game.
+
+## 22 October 2026 — session 5: the log cap, and two predictions confirmed
+
+First session at `iLevel = 3`. The log hit its 200,000-line cap at 00:06:26, 36 minutes
+in: the float watch writes every float that moves, every poll, at Debug. I had told the
+maintainer that nothing at Debug repeats every frame; that was wrong, I had checked only
+the watch's manual (F10) mode. Moved to Trace; the `.conf` text said "Debug" and says
+"Trace" now.
+
+Before the cap (SPEC §4.9, session 5): own time 1.3 to 3.8 ms per second (was 53 to 84),
+spell cost 277 three times as predicted from base Luck 64, one more expiry at a partial
+pool kept from −104, and the first game-array change (Intelligence −1, maximum −2),
+corrected. Scenario 7 not reached before the cap.
+
+The one-line summaries read well at Info.

@@ -752,6 +752,24 @@ of it, recasting it before or as it ran out, with and without armor (95 % magnit
 - **Own time**: 53 to 84 ms per second, the memory map refresh again (105 to 216 ms). The
   build after session 3 removes it.
 
+Session 5, night of 21 to 22 October 2026, 23:29 to past 00:06, the first with the one-line log and the
+first at `iLevel = 3`. The log stopped at 00:06:26 on its 200,000-line cap, filled by the
+float watch's per-poll lines (now Trace, §6.6); what happened after that is not in it.
+Ten transitions before the cap, seven writes, no failure:
+
+- **Own time 1.3 to 3.8 ms per second**, after 9.6 in the first minute (four player
+  searches at startup, 33 ms each), against 53 to 84 before: the periodic memory map
+  refresh was the cost, as §4.9 session 3 said.
+- **Spell cost 277**, three times (23:36:43, 23:45:16, and 00:03:57 at 95 % magnitude),
+  as §4.7.3 predicted from base Luck 64. First prediction of the cost fit checked in game.
+- Another expiry at a partial pool (23:37:40): vanilla would have left −104 / 322, the fix
+  kept 196 / 322.
+- **First game-array change** (23:49:26): Intelligence −1 in the game array, maximum −2,
+  pool 174 kept. The game array now holds −2 on Intelligence. `[DEDUCTION]`: another
+  Damage Intelligence; the player did not report its source.
+- No recast in two steps before the cap: scenario 7 is still untested. The three expiries
+  at a full pool each logged their 300-point spill, and no rise came within the window.
+
 ## 5. The correction rule
 
 Let `d` be the deficit, `m` the max, `m'` the new max, `Δ = m' − m`.
@@ -1144,6 +1162,9 @@ player's first spell, or even indefinitely.
   (§5.5), which asks to be reported. Skill-ups, the skill lines of the character block and
   the recast lines inside the window are Debug.
 - **Test sessions run at `iLevel = 3`.** The shipped default stays 2, for players.
+  Nothing at Debug repeats every poll: the float watch's per-poll changes are Trace.
+  They were Debug until 22 October 2026, and the first session at `iLevel = 3` hit the
+  200,000-line cap in 36 minutes with them (§4.9).
 - The "deficit under preservation" line (Debug) is essential for diagnosis: it is what separates
   a spell's cost from compensation, as in §4.2.
 - Since 1.0.0-dev each transition also says which source moved (Debug; the one-line

@@ -407,7 +407,8 @@ iDumpTo   = 0xB88
 ; only the offsets that CHANGED, with old value, new value and delta. This is what
 ; makes offset re-discovery practical: cast a spell of known cost and look for the
 ; offset that moved by exactly that amount, instead of diffing hex by eye.
-; Changes are reported at Debug level, and always on a manual dump.
+; Changes are reported at Trace level (iLevel = 4: every poll, so keep sessions
+; short), and always on a manual dump.
 bFloatWatch = 1
 
 ; At startup, write the loaders and mods found in the game process, one line,
