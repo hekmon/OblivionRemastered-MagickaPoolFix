@@ -1,8 +1,9 @@
 // Config.h - MagickaPoolFix
 //
-// A .conf file sitting next to the .asi, auto-generated when missing or
-// unreadable. Convention borrowed from "Delete Spells - OBSE - ASI" (Nexus 4934):
-// Hungarian b/i/f/s prefixes, automatic regeneration of the defaults.
+// A .conf file sitting next to the .asi, written with the defaults when it is
+// missing, and never overwritten once it exists, even when it cannot be read.
+// Convention borrowed from "Delete Spells - OBSE - ASI" (Nexus 4934): Hungarian
+// b/i/f/s prefixes, automatic regeneration of the defaults.
 //
 // The file DOUBLES AS THE README: every option is documented with its balance
 // implications and the URLs of its sources. Since an ASI plugin has no console,
@@ -80,8 +81,10 @@ struct Config {
     int policyConfirmations  = 1;
 
     // Parse diagnostics, reported at startup.
-    bool generated       = false;  // file was created by us
-    bool unwritable      = false;  // file was missing AND could not be created
+    bool generated       = false;  // the file was missing and has just been created
+    bool unwritable      = false;  // the file was missing AND could not be created
+    bool unreadable      = false;  // the file exists but could not be read: left untouched
+    unsigned long fileError = 0;   // Windows error behind unwritable or unreadable
     bool magickaIgnored  = false;  // [Magicka] was edited while iPreset != 3
     bool heartbeatRaised = false;  // iHeartbeatSeconds < 60, raised to the floor
 
@@ -136,8 +139,9 @@ R"CONF(; =======================================================================
 ;  MagickaPoolFix - configuration
 ;  The Elder Scrolls IV: Oblivion Remastered - ASI plugin
 ;
-;  This file is auto-generated when it is missing or unreadable, so you can
-;  always delete it to get a clean, fully commented copy back.
+;  This file is written with the defaults when it is missing, so you can always
+;  delete it to get a clean, fully commented copy back. A file that exists is
+;  never overwritten, even one the plugin cannot read: the log says so instead.
 ;  It doubles as the mod's readme: every option below is documented.
 ; ============================================================================
 ;
@@ -564,22 +568,84 @@ inline bool ParseBool(const std::string& v, bool& out) {
 
 }  // namespace detail
 
-inline bool WriteDefaultConfig(const std::string& path) {
-    std::FILE* f = std::fopen(path.c_str(), "w");
-    if (!f) { return false; }
-    std::fputs(DefaultConfigText(), f);
-    std::fclose(f);
+// Plain words for the Windows errors a player can actually fix.
+inline const char* FileErrorText(unsigned long e) {
+    switch (e) {
+    case ERROR_ACCESS_DENIED:     return "access denied";
+    case ERROR_SHARING_VIOLATION: return "in use by another program";
+    case ERROR_LOCK_VIOLATION:    return "locked by another program";
+    case ERROR_PATH_NOT_FOUND:    return "folder not found";
+    case ERROR_WRITE_PROTECT:     return "write-protected";
+    case ERROR_DISK_FULL:         return "disk full";
+    case ERROR_DIRECTORY:         return "a folder has that name";
+    default:                      return "Windows error";
+    }
+}
+
+// Creates the file with the default text, CRLF line endings, and fails rather
+// than replace anything: CREATE_NEW refuses a file that already exists, so this
+// can never overwrite a player's settings, whatever happens between the check in
+// LoadConfig and this call. A partial write removes its own half-written file.
+inline bool WriteDefaultConfig(const std::string& path, unsigned long& err) {
+    std::string text;
+    for (const char* p = DefaultConfigText(); *p; ++p) {
+        if (*p == '\n') { text += '\r'; }
+        text += *p;
+    }
+    const HANDLE h = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                                 FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        err = GetLastError();
+        return false;
+    }
+    DWORD written = 0;
+    const BOOL ok = WriteFile(h, text.data(), static_cast<DWORD>(text.size()), &written,
+                              nullptr);
+    err = ok ? 0 : GetLastError();
+    CloseHandle(h);
+    if (!ok || written != text.size()) {
+        if (err == 0) { err = ERROR_WRITE_FAULT; }
+        DeleteFileA(path.c_str());
+        return false;
+    }
     return true;
 }
 
-// Returns false when the file did not exist; in that case it has just been
-// created with the defaults, which are already loaded in cfg.
+// Why an existing file cannot be opened for reading, as a Windows error code.
+inline unsigned long ReadErrorOf(const std::string& path, DWORD attributes) {
+    if (attributes & FILE_ATTRIBUTE_DIRECTORY) { return ERROR_DIRECTORY; }
+    const HANDLE h = CreateFileA(path.c_str(), GENERIC_READ,
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                 nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) { return GetLastError(); }
+    CloseHandle(h);
+    return 0;  // readable now: it was a transient failure
+}
+
+// Returns whether the file existed. Besides a normal read, two outcomes, each
+// reported in the log by the caller:
+//   - missing: the defaults are written (generated), or could not be (unwritable);
+//   - present but unreadable: it is left untouched (unreadable).
+// Whenever the file was not read, the compiled defaults, already in cfg, apply.
 inline bool LoadConfig(const std::string& path, Config& cfg) {
     std::FILE* f = std::fopen(path.c_str(), "r");
     if (!f) {
-        cfg.generated   = WriteDefaultConfig(path);
-        cfg.unwritable  = !cfg.generated;
-        return false;
+        const DWORD attributes = GetFileAttributesA(path.c_str());
+        const DWORD why = attributes == INVALID_FILE_ATTRIBUTES ? GetLastError() : 0;
+        if (attributes == INVALID_FILE_ATTRIBUTES &&
+            (why == ERROR_FILE_NOT_FOUND || why == ERROR_PATH_NOT_FOUND)) {
+            unsigned long err = 0;
+            cfg.generated  = WriteDefaultConfig(path, err);
+            cfg.unwritable = !cfg.generated;
+            cfg.fileError  = err;
+            return false;
+        }
+        // It exists, or whether it exists cannot be established. Either way it is
+        // not ours to replace.
+        cfg.unreadable = true;
+        cfg.fileError  = attributes == INVALID_FILE_ATTRIBUTES ? why
+                                                               : ReadErrorOf(path, attributes);
+        return true;
     }
 
     // Remember the [Magicka] values as they stood so we can detect a silent edit

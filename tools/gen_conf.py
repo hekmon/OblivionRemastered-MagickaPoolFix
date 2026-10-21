@@ -4,7 +4,7 @@ and check its structure.
 
 The plugin writes this exact text when MagickaPoolFix.conf is missing, so the file
 produced here is byte-identical to the one a player gets on first launch (the
-plugin opens it in text mode on Windows, which turns every LF into CRLF).
+plugin turns every LF into CRLF as it writes, see WriteDefaultConfig).
 
 Usage: gen_conf.py <path/to/Config.h> <output.conf>
 Exits non-zero, after listing every failure, if a check fails.

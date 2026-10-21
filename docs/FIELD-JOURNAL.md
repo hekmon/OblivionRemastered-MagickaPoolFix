@@ -2447,3 +2447,28 @@ so too.
 `LoadConfig` writes the defaults whenever it cannot open the file, so an existing but
 unreadable `.conf` (locked, for instance) would be overwritten. The text says "missing or
 unreadable", which matches the code; whether to keep that behaviour is open.
+
+## 21 October 2026 — the `.conf` is never overwritten
+
+Until now `LoadConfig` wrote the defaults whenever it could not open the file, so an
+existing `.conf` that was locked by another program or unreadable because of its
+permissions would have been replaced, losing the player's settings. Decision of the
+maintainer: write only when the file is truly missing, and log what was done or could
+not be done.
+
+- **Missing** means `GetFileAttributesA` fails with `ERROR_FILE_NOT_FOUND` or
+  `ERROR_PATH_NOT_FOUND`. Only then are the defaults written, through `CreateFileA` with
+  `CREATE_NEW`, which refuses an existing file by construction. A partial write deletes
+  its own half-written file. LF becomes CRLF as it writes, as text mode did, so the file
+  stays byte-identical to the output of `tools/gen_conf.py`.
+- **Anything else is left untouched**: a file that exists but cannot be read, or one whose
+  existence cannot be established. The run uses the compiled defaults.
+- **Reported in the log**: the summary line says `conf found`, `was missing, created with
+  defaults`, `missing and NOT creatable` or `present but NOT readable, left untouched`.
+  Each failure adds an error line with the reason in plain words and the Windows error
+  code (access denied, in use by another program, locked, folder not found, ...).
+- The old log fallback message claimed the `.conf` could not be created whenever the log
+  could not be; it now speaks only of the log.
+
+Built (176 OK, 0 warnings, imports unchanged); not run on Windows. No Windows runtime is
+available here, so none of the failure paths has been exercised.

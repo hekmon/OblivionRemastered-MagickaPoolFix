@@ -536,8 +536,9 @@ void LogStartupSummary(bool confExisted) {
              g_cfg.dryRun ? "DRY RUN (no memory writes)" : "ACTIVE",
              __DATE__, __TIME__, exeName.c_str(), build,
              mpf::PresetName(g_cfg.preset), g_cfg.enginePolicy, g_cfg.dryRun ? 1 : 0,
-             confExisted        ? "found"
-             : g_cfg.generated  ? "created with defaults"
+             g_cfg.unreadable   ? "present but NOT readable, left untouched, running on defaults"
+             : confExisted      ? "found"
+             : g_cfg.generated  ? "was missing, created with defaults"
                                 : "missing and NOT creatable, running on defaults");
 
     if (haveTs && !validated && !g_cfg.dryRun) {
@@ -1398,14 +1399,21 @@ DWORD WINAPI InitThread(LPVOID) {
     LoadProfileFolder();
     LogStartupSummary(confExisted);
     if (logFellBack) {
-        MPF_ERR("The plugin's own folder is not writable, so this log was written to "
-                "%s instead. The .conf could not be created there either: the plugin "
-                "is running on compiled defaults.", Anon(logPath).c_str());
+        MPF_ERR("The log could not be created next to the plugin, so it was written to "
+                "%s instead.", Anon(logPath).c_str());
     }
     if (g_cfg.unwritable) {
-        MPF_ERR("%s does not exist and could not be created. Running on compiled "
-                "defaults; any edit you make elsewhere will be ignored.",
-                Anon(confPath).c_str());
+        MPF_ERR("%s does not exist and could not be created (%s, error %lu). This run "
+                "uses the compiled defaults; any edit you make elsewhere is ignored.",
+                Anon(confPath).c_str(), mpf::FileErrorText(g_cfg.fileError),
+                g_cfg.fileError);
+    }
+    if (g_cfg.unreadable) {
+        MPF_ERR("%s exists but could not be read (%s, error %lu). It was left "
+                "untouched, and this run uses the compiled defaults, not your settings. "
+                "Close whatever program holds it, or fix its permissions, then restart "
+                "the game.", Anon(confPath).c_str(), mpf::FileErrorText(g_cfg.fileError),
+                g_cfg.fileError);
     }
 
     // A breadcrumb left by a previous launch means that launch entered a game
