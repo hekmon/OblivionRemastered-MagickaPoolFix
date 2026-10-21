@@ -19,10 +19,8 @@ about the game in these docs comes from a log or a cited source, or is marked
 *Playing rather than developing? The download and the player guide are on the Nexus page
 linked in this repository's About box.*
 
-**Built with an AI, under direction.** Claude (Anthropic) writes the code and the docs. I
-set the scope, make every decision and play every test session, and every in-game claim
-here comes from a log I sent back. How that works:
-[How this project is made](#how-this-project-is-made).
+**AI-written, human-directed.** Code and docs by Claude (Anthropic); scope, decisions and
+every in-game test by me. How that works: [How this project is made](#how-this-project-is-made).
 
 ---
 
@@ -49,26 +47,6 @@ The intended model of this mod is a glass of water:
 100/600, buff ends   ->  100/300   (vanilla: -200/300)
 350/600, buff ends   ->  300/300   (vanilla: 50/300)
 ```
-
-### What the fix costs
-
-It is a fix, and like any fix that closes an exploit, it costs something to the players
-who used it. UESP documents the free magicka as a mechanic players use on purpose, "spell
-chaining", which allows "the player to cast the same spell infinitely"
-([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making#Spell_Chaining)). With
-the fix, free magicka on activation is gone, and so are the exploits that rely on negative
-magicka. Regeneration and restore effects become what refills the pool, and regeneration
-grows with the square of Willpower:
-`2 x (W/50)^2 + 1.5 x (W/50)` per second, so 11.00 /s at Willpower 100, 22.50 /s at 150 and
-38.00 /s at 200, halved in combat. That is the formula of UESP's Willpower page, the one the
-measurement confirms; two other UESP pages give different ones
-([UESP, Willpower](https://en.uesp.net/wiki/Oblivion:Willpower); [`docs/SPEC.md`](docs/SPEC.md)
-sections 3.3 and 10.7). `[DEDUCTION]`: for a mage relying on fortify spells, fortifying
-Willpower is the main lever on that cost.
-
-`iPreset = 1` keeps vanilla behavior except for the floor at zero. It is not
-balance-neutral: the free magicka is still granted, and the debt it leaves at expiry is
-forgiven ([`docs/SPEC.md`](docs/SPEC.md) section 4.4).
 
 ## Why this exists
 
@@ -149,6 +127,26 @@ plugin would then be subtracting the change twice. `iEnginePolicy` controls this
 
 The model is `src/MagickaMath.h`; when to apply it is `src/Corrector.h`. Both are free of
 any Windows dependency and covered by host unit tests that replay the measured transitions.
+
+## What the fix costs
+
+It is a fix, and like any fix that closes an exploit, it costs something to the players
+who used it. UESP documents the free magicka as a mechanic players use on purpose, "spell
+chaining", which allows "the player to cast the same spell infinitely"
+([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making#Spell_Chaining)). With
+the fix, free magicka on activation is gone, and so are the exploits that rely on negative
+magicka. Regeneration and restore effects become what refills the pool, and regeneration
+grows with the square of Willpower:
+`2 x (W/50)^2 + 1.5 x (W/50)` per second, so 11.00 /s at Willpower 100, 22.50 /s at 150 and
+38.00 /s at 200, halved in combat. That is the formula of UESP's Willpower page, the one the
+measurement confirms; two other UESP pages give different ones
+([UESP, Willpower](https://en.uesp.net/wiki/Oblivion:Willpower); [`docs/SPEC.md`](docs/SPEC.md)
+sections 3.3 and 10.7). `[DEDUCTION]`: for a mage relying on fortify spells, fortifying
+Willpower is the main lever on that cost.
+
+`iPreset = 1` keeps vanilla behavior except for the floor at zero. It is not
+balance-neutral: the free magicka is still granted, and the debt it leaves at expiry is
+forgiven ([`docs/SPEC.md`](docs/SPEC.md) section 4.4).
 
 ## Status
 
