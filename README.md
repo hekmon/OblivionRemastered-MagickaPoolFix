@@ -3,13 +3,12 @@
 An ASI plugin for **The Elder Scrolls IV: Oblivion Remastered** that keeps current magicka
 consistent when maximum magicka changes.
 
-The engine never stores current magicka. It stores a deficit, a float at
-`PlayerCharacter + 0x6B8`, and computes `current = maximum + deficit` whenever it needs the
-value. When a Fortify effect starts or ends, the maximum moves and nothing rebases the
-deficit: the buff hands out free magicka, and its expiry can leave the pool hundreds of
-points below zero. This plugin rebases it. It writes that one float from its own thread
-and reads it back, with no hook and no code patch. `bDryRun = 1` in the `.conf` makes it
-log what it would do without writing anything.
+The engine never stores current magicka. It stores a deficit, how much is missing from a
+full pool counted as a negative number, and computes `current = maximum + deficit`
+whenever it needs the value. When a Fortify effect starts or ends, the maximum moves but
+the deficit does not: the buff hands out free magicka, and its expiry can leave the pool
+hundreds of points below zero. This plugin adjusts the deficit each time the maximum
+moves. That one value is all it changes: no hook, no code patch.
 
 Validated in game on the Steam build whose executable has PE timestamp `0xF19077A4`: 6 h 14
 min of logged play over two sessions, 33 transitions, 24 writes, no failure. Every claim
@@ -113,9 +112,10 @@ delta = 2 x delta(Intelligence) + delta(Magicka)
 
 which holds above Intelligence 100 too
 ([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making)). On each transition
-it writes `deficit' = min(deficit - delta, 0)`, then reads it back. That one rule covers the
-three cases: the water stays when the glass grows, stays when the glass shrinks but its
-rim is still above the water, and the glass is left full when the water no longer fits.
+it writes `deficit' = min(deficit - delta, 0)` to the deficit, a float at
+`PlayerCharacter + 0x6B8`, then reads it back. That one rule covers the three cases: the
+water stays when the glass grows, stays when the glass shrinks but its rim is still above
+the water, and the glass is left full when the water no longer fits.
 
 The rule is relative, so it is only right if the game did not already adjust the deficit
 itself. That was measured on the build above: it does not. The plugin keeps checking
