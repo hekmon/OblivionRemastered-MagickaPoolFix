@@ -77,7 +77,8 @@ inline const char* SkillName(int i) {
 
 // Mastery follows the BASE skill: 0-24 Novice, 25-49 Apprentice, 50-74
 // Journeyman, 75-99 Expert, 100 Master (UESP, Oblivion:Skills). Fortify effects
-// do not unlock perks.
+// do not unlock perks. That page has no Remastered note: for Remastered this is
+// [DEDUCTION].
 inline const char* MasteryName(int base) {
     if (base >= 100) { return "Master"; }
     if (base >= 75)  { return "Expert"; }

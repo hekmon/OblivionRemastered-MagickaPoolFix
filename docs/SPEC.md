@@ -60,11 +60,32 @@ This model addresses the three symptoms of chapter 1 without introducing any new
 there is neither a bonus nor a penalty attached to the change in capacity, only a
 geometric consequence.
 
-It also matches the way the game already documents one of the two effects
-involved: Fortify Magicka is described as not adding current magicka,
-whereas Fortify Intelligence has no such guarantee
-([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making)). The mod makes the
-treatment uniform.
+It departs, on purpose, from what UESP documents for the original game. The Spell Making
+page, in its "Spell Chaining" section, describes:
+
+- Fortify Magicka and Fortify Intelligence as adding their magnitude (twice it, for
+  Intelligence) to both current and maximum magicka;
+- Drain Magicka as removing its magnitude from both;
+- on expiry, Fortify Magicka and Drain Magicka as unable to take current magicka below
+  zero, while Fortify Intelligence can.
+
+It presents the free magicka as a mechanic players exploit, spell chaining, "allowing the
+player to cast the same spell infinitely"
+([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making#Spell_Chaining)).
+The glass of water removes that mechanic, for all three effects alike.
+
+Withdrawn: an earlier version of this paragraph said that page describes Fortify Magicka
+as *not* adding current magicka, unlike Fortify Intelligence. The page says the opposite.
+
+Whether Remastered keeps the floor at zero for Fortify Magicka and Drain Magicka is
+discussed in §10.5. The measurement of §4.1 rules it out for a combined expiry.
+
+**Position.** This document treats the defect of chapter 4 as a bug and the mod as a fix.
+The free magicka and the negative pool follow from a deficit the engine never rebases
+(§4), and a fix that closes an exploit changes the balance for the players who used it
+(§7.1). Whether the original designers meant the side effect is not documented; UESP
+describes it as something players exploit. The same position is taken for the two
+uncapper mods of §10.7, which this document does not otherwise judge.
 
 ## 3. How the engine actually stores magicka
 
@@ -119,15 +140,39 @@ mechanic in depth: in the original Oblivion the rate was
 `0.01 × (0.75 + 0.02 × Willpower) × total_magicka`, hence **proportional to the size of the
 pool**; in Remastered it depends only on Willpower, it is halved in
 combat, and it is suspended for 2 seconds after each cast
-([UESP, Willpower](https://en.uesp.net/wiki/Oblivion:Willpower)). The Remastered formula
-is the one used here, and it is the one the measurement confirms: the original formula
-would predict 17.05 /s on a pool of 620, which the measurement at 12.98 /s rules out.
+([UESP, Willpower](https://en.uesp.net/wiki/Oblivion:Willpower), section "Oblivion
+Remastered"). The Remastered formula is the one used here, and it is the one the
+measurement confirms: the original formula would predict 17.05 /s on a pool of 620, which
+the measurement at 12.98 /s rules out.
 
-The gap between the Willpower 100 on the character sheet and the **effective Willpower 110** of the
-measurement is explained: vampirism fortifies Willpower by +5, +10, +15 or +20 depending on the stage
-([UESP, Vampirism](https://en.uesp.net/wiki/Oblivion:Vampirism)), and the test character
-is a vampire. The +10 corresponds to the 50% stage. The character's regeneration rate
-therefore varies from 11.00 /s to 15.12 /s depending on whether they have fed or not, a 37% spread.
+**UESP contradicts itself on the Remastered formula.** Three pages give three formulas,
+here evaluated out of combat at the effective Willpower of 110:
+
+| UESP page | Remastered formula, out of combat | at W = 110 |
+|---|---|---:|
+| [Willpower](https://en.uesp.net/wiki/Oblivion:Willpower) | `2 × (W/50)² + 1.5 × (W/50)`, halved in combat | **12.98 /s** |
+| [Magicka](https://en.uesp.net/wiki/Oblivion:Magicka) | `2.0 × (W × W × 0.0003 + W × 0.015)` | 10.56 /s |
+| [Remastered Changes](https://en.uesp.net/wiki/Oblivion:Remastered_Changes) | `W × W × 0.02 + W × 0.015`, "increased 2.0x when out of combat" | 243.65 /s or more |
+
+The measurement, 12.98 /s with 102 of 103 samples within ±0.005, agrees with the
+Willpower page only. The Magicka page's formula does not reach it for any plausible
+Willpower either (W = 105, 110, 115, 120 give 9.76 to 12.24 /s). The Willpower page is the one used here.
+
+The gap between the Willpower 100 on the character sheet and the **effective Willpower
+110** of the measurement comes from a modifier, and **not from vampirism** as an earlier
+version of this section said. The same run recorded `+10.0000` on all eight attributes in
+the magic modifier array (`+0x0474` to `+0x0490`, `FIELD-JOURNAL.md`, 6 August 2026,
+0.4.0-probe). Vampirism fortifies only Strength, Speed and Willpower, by +5, +10, +15 or
++20 depending on the stage ([UESP, Vampirism](https://en.uesp.net/wiki/Oblivion:Vampirism)),
+so a +10 on Intelligence, Agility, Endurance, Personality and Luck is something else.
+`[DEDUCTION]`: an item or effect fortifying every attribute by 10. A vampirism bonus on
+top of it would have given Willpower 115 or more and at least 14.03 /s, so none was in
+effect during that measurement. Withdrawn: "the +10 corresponds to the 50% stage".
+
+The test character is a vampire, so its rate can still swing with the stage: from 12.98 /s
+(Willpower 110, no stage bonus) to 17.42 /s (Willpower 130, +20), by the formula above.
+Which stage the character was at on any given day is not in the logs. The 1.0.0-dev log
+prints the Willpower modifier with each character block (§10.8).
 
 Practical consequence: an overdraft of 250 points costs 19 seconds of waiting before
 the first point of magicka is spendable again.
@@ -522,7 +567,7 @@ What this session adds:
   Whether that is right is a design question, open in §10.5.
 - **An Intelligence −1 that does not end** (event 13). `[DEDUCTION]`: a Damage
   Intelligence, which lasts until restored
-  ([UESP, Drain](https://en.uesp.net/wiki/Oblivion:Drain) contrasts it with Drain). The
+  ([UESP, Magical Effects](https://en.uesp.net/wiki/Oblivion:Magical_Effects#Drain_vs._Damage_vs._Absorb) contrasts it with Drain). The
   `PARTIAL` verdict comes from regeneration within the same 16 ms poll (+0.14) exceeding
   the tolerance of a 2-point change (§5.4); the decision does not depend on the verdict
   and current magicka was preserved.
@@ -1125,7 +1170,7 @@ is emitted — correct behavior, not a blind spot. Feeding or progressing in vam
 All measurements show `Δmax = +300` exactly, because spell effectiveness was 100%. As
 soon as a piece of armor is worn, this effectiveness is capped at 95% and multiplies the
 **magnitude** of the effect
-([UESP, Spell Effectiveness](https://en.uesp.net/wiki/Oblivion:Spell_Effectiveness)). A
+([UESP, Magic Overview](https://en.uesp.net/wiki/Oblivion:Magic_Overview#Spell_Effectiveness)). A
 player in heavy armor at skill 50 will therefore see `Δmax = 285` and not 300, with
 non-integer values for other combinations.
 
@@ -1146,13 +1191,28 @@ Intelligence.
 every change, and the mod did what it does for every change: it preserved current
 magicka on the way down and refused the gain on the way back. A Drain Magicka on a pool
 that is not full therefore costs the player nothing with the fix, where vanilla takes the
-magnitude away for the duration. The glass-of-water model of chapter 2 says that is
-correct: the glass shrank, the water stayed below the rim. A reading in which a drain is
-meant to take the water is also possible, and UESP does not settle it: drain effects
-"reduce the points of a target's statistic" and "are then automatically reversed"
-([UESP, Drain](https://en.uesp.net/wiki/Oblivion:Drain)), without saying whether current
-or maximum is meant. Telling a hostile drain apart from the expiry of the player's own
+magnitude away for the duration.
+
+The documented behaviour is the vanilla one. For the original game, UESP describes Drain
+Magicka as one that "temporarily reduces the current and maximum magicka, however it
+cannot reduce the current Magicka below zero"
+([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making#Spell_Chaining)), and
+§4.8 shows the Remastered engine taking the 22 points from current magicka. So the fix
+changes what a drain does. The glass-of-water model calls that consistent: the glass
+shrank, the water stayed below the rim. As a game rule it is a choice: a drain is meant to
+take magicka away. Telling a hostile drain apart from the expiry of the player's own
 fortify would need the list of active effects, which the mod does not read.
+
+**Open risk: a floor at zero applied by the engine.** The same page says that Fortify
+Magicka's expiry and Drain Magicka cannot take current magicka below zero. If the
+Remastered engine applies such a floor, it moves the deficit itself on those
+transitions, and the relative rule of chapter 5, which assumes the engine left the
+deficit alone, would then grant the difference a second time. The measurement of §4.1
+rules this out for a combined expiry: Fortify Intelligence 100 and Fortify Magicka 100
+ending together took current magicka from 52.23 to −247.77. That is the full 300, and no
+order of applying the two with a floor gives that number. `[DEDUCTION]`: Remastered does
+not apply the floor. A **Fortify Magicka alone** expiring at a low pool, and a drain on a
+nearly empty pool, have not been measured.
 
 `[DEDUCTION]`: all of them go through the same modifier arrays, so the rule should apply
 as is. A level-up, on the other hand, raises the base attribute and not a modifier, and
@@ -1248,7 +1308,7 @@ Sources:
   21 skills, health and the 8 attributes
   ([UESP, NPC_ record](https://en.uesp.net/wiki/Oblivion_Mod:Mod_File_Format/NPC_)).
 - Form IDs `0x14` (player reference) and `0x07` (player base NPC):
-  [UESP, Player](https://en.uesp.net/wiki/Oblivion:Player) and
+  [UESP, Bendu Olo](https://en.uesp.net/wiki/Oblivion:Bendu_Olo) (the default player character) and
   [CS wiki, Player](https://cs.uesp.net/wiki/Player).
 - Actor-value order, used for the modifier totals and the skill names:
   [CS wiki, Stats List](https://cs.uesp.net/wiki/Stats_List). It agrees with the field
@@ -1256,7 +1316,8 @@ Sources:
   enumeration contradicts the dump and is not used.
 - Mastery follows the **base** skill (Novice below 25, Apprentice, Journeyman, Expert,
   Master at 100), and Fortify effects do not unlock perks
-  ([UESP, Skills](https://en.uesp.net/wiki/Oblivion:Skills)).
+  ([UESP, Skills](https://en.uesp.net/wiki/Oblivion:Skills)). That page has no
+  Remastered note, so for Remastered this is `[DEDUCTION]`.
 
 Before any field is trusted, the player's form ID, the base form's form ID and the base
 form's vtable (`TESNPC`, found through RTTI) are checked. If a check fails, the log says
@@ -1317,11 +1378,19 @@ ambiguous transition instead of asking that transition to make it.
 
 ## 12. Sources
 
-- [UESP — Magicka](https://en.uesp.net/wiki/Oblivion:Magicka): `maximum = 2 × Intelligence` plus flat race and birthsign bonuses.
-- [UESP — Willpower](https://en.uesp.net/wiki/Oblivion:Willpower): magicka regeneration governed by Willpower.
-- [UESP — Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making): Fortify Magicka does not add current magicka, unlike Fortify Intelligence.
-- [UESP — Spell Effects](https://en.uesp.net/wiki/Oblivion:Spell_Effects): spell cost, `B × M × D × A` with `M = magnitude^1.28` and a per-effect factor of `1.4 − 0.012 × skill`.
-- [UESP — Luck](https://en.uesp.net/wiki/Oblivion:Luck): `effective skill = skill + 0.4 × (Luck − 50)`.
+UESP documents Oblivion Remastered inside the same `Oblivion:` namespace as the original
+game ([UESP, Oblivion Remastered](https://en.uesp.net/wiki/Oblivion:Oblivion_Remastered)):
+some pages have an "Oblivion Remastered" section, some carry inline Remastered notes, and
+many have neither. A statement from a page without a Remastered note describes the
+original game; this document says so where it relies on one, and says what was measured.
+
+- [UESP — Magicka](https://en.uesp.net/wiki/Oblivion:Magicka): `maximum = 2 × Intelligence` plus flat race and birthsign bonuses, under "Original Oblivion". The Remastered section covers regeneration only; the maximum formula is confirmed in Remastered by measurement (§4.3, §4.6). Its Remastered regeneration formula disagrees with the measurement (§3.3).
+- [UESP — Willpower](https://en.uesp.net/wiki/Oblivion:Willpower): magicka regeneration, with a Remastered section whose formula the measurement confirms (§3.3).
+- [UESP — Remastered Changes](https://en.uesp.net/wiki/Oblivion:Remastered_Changes) and [Remastered Leveling](https://en.uesp.net/wiki/Oblivion:Remastered_Leveling): Remastered only.
+- [UESP — Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making): "Spell Chaining" (original game): Fortify Magicka and Intelligence add to current and maximum, Drain Magicka removes from both, with a floor at zero for Magicka effects (§2, §10.5). A Remastered note: several Fortify Attribute and Fortify Skill effects may be combined in one spell.
+- [UESP — Spell Effects](https://en.uesp.net/wiki/Oblivion:Spell_Effects): spell cost, `B × M × D × A` with `M = magnitude^1.28` and a per-effect factor of `1.4 − 0.012 × skill` (original game; the same constants appear in mod 1846's source, §4.7.3).
+- [UESP — Luck](https://en.uesp.net/wiki/Oblivion:Luck): `effective skill = skill + 0.4 × (Luck − 50)` (original game; mod 1846 calls the game's own `luck_skill_modifier`).
+- [UESP — Magic Overview](https://en.uesp.net/wiki/Oblivion:Magic_Overview#Spell_Effectiveness): spell effectiveness capped at 95 % in armor (original game; measured in Remastered, §4.8).
 - [commonlibob64, `PlayerCharacter.h`](https://github.com/libxse/commonlibob64/blob/main/include/RE/P/PlayerCharacter.h): class layout, origin of the four offsets of chapter 3.
 - [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader): `.asi` loader, installed as `version.dll`.
 - [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS): installed as `dwmapi.dll`, producer of the memory dump files.

@@ -1,115 +1,41 @@
 # MagickaPoolFix
 
-An ASI plugin for **The Elder Scrolls IV: Oblivion Remastered** that fixes how current
-magicka behaves when maximum magicka changes.
+An ASI plugin for **The Elder Scrolls IV: Oblivion Remastered** that keeps current magicka
+consistent when maximum magicka changes.
 
-This README is the developer's entry point: what the plugin does, how it is built, tested
-and released. A player-facing description will live on the mod page. Contributors, human
-or AI, should also read [`AGENTS.md`](AGENTS.md).
+The engine never stores current magicka. It stores a deficit, a float at
+`PlayerCharacter + 0x6B8`, and computes `current = maximum + deficit` whenever it needs the
+value. When a Fortify effect starts or ends, the maximum moves and nothing rebases the
+deficit: the buff hands out free magicka, and its expiry can leave the pool hundreds of
+points below zero. This plugin rebases it. It writes that one float from its own thread
+and reads it back, with no hook and no code patch. `bDryRun = 1` in the `.conf` makes it
+log what it would do without writing anything.
 
-**Built with an AI.** The code and the docs are written by Claude (Anthropic); the scope,
-the decisions, every iteration and every in-game test are mine. See
+Validated in game on the Steam build whose executable has PE timestamp `0xF19077A4`: 6 h 14
+min of logged play over two sessions, 33 transitions, 24 writes, no failure. Every claim
+about the game in these docs comes from a log or a cited source, or is marked
+`[DEDUCTION]`.
+
+*Playing rather than developing? The download and the player guide are on the Nexus page
+linked in this repository's About box.*
+
+**Built with an AI, under direction.** Claude (Anthropic) writes the code and the docs. I
+set the scope, make every decision and play every test session, and every in-game claim
+here comes from a log I sent back. How that works:
 [How this project is made](#how-this-project-is-made).
-
-> **This plugin writes to game memory by default.** It writes one float, the player's
-> magicka deficit, when a change of maximum magicka needs correcting, and reads it back
-> to confirm the write took. No function is hooked and no game code is patched. Set
-> `bDryRun = 1` in the `.conf` to watch what it would do without letting it act.
-
-Validated in game on the Steam build whose executable has PE timestamp `0xF19077A4`.
-A game update may break it; see [Limitations](#limitations).
 
 ---
 
-## Why this exists
-
-This plugin was born from an end-game mage build: custom spells that push Intelligence,
-Willpower and the magic skills well past 100, recast every time they expire. Two mods by
-Baestus are what make such a build worth playing, because the base game clamps values
-above 100 in the formulas that matter:
-
-- [**Skill Damage Scaling Cap Remover**](https://github.com/Baestus/OBSE64_Skill_Damage_Scaling_Cap_Remover)
-  (Nexus [1846](https://www.nexusmods.com/oblivionremastered/mods/1846)). The game caps
-  skills at 100 in `luck_skill_modifier`; the mod patches that cap out and hooks the
-  spell cost formula. A fortified skill above 100 keeps lowering spell costs, as
-  `0.2 x base x 100 / skill`, instead of stopping at the vanilla floor of 20 % of the base
-  cost, and keeps raising damage.
-- [**Attribute Scaling Cap Remover**](https://github.com/Baestus/OBSE64_Attribute_Scaling_Cap_Remover)
-  (Nexus [2068](https://www.nexusmods.com/oblivionremastered/mods/2068)). Attributes above
-  100 count in the damage formula instead of being clamped to 100.
-
-Their source code was also this plugin's starting point; see [Credits](#credits).
-
-Neither mod lets a *base* skill or attribute level past 100. Neither touches maximum
-magicka or regeneration either: 1846's source hooks only the cost formula, and 2068's
-README describes the damage formula only. Those two did not need uncapping. Intelligence
-above 100 already adds 2 magicka per point in the base game
-([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making)), and regeneration,
-`2 x (W/50)^2 + 1.5 x (W/50)` per second, was measured following an effective Willpower of
-110, not a capped 100 ([`docs/SPEC.md`](docs/SPEC.md) section 3.3). `[DEDUCTION]`: since
-neither mod touches regeneration, that is the base game's behaviour. Details and sources:
-[`docs/SPEC.md`](docs/SPEC.md) sections 4.7.3 and 10.7.
-
-The result is a magicka pool that swings by hundreds of points every time a buff is cast or
-expires. On the test character, one Fortify Intelligence 100 + Fortify Magicka 100 spell
-takes maximum magicka from 320 to 620 for 55 seconds, then back, and is recast over and
-over. That is where the engine's bookkeeping
-defect, harmless on a +10 ring, becomes the main thing happening to the magicka bar:
-
-- the buff refills the pool for free when it starts, so the spell more than pays for itself
-  (measured: 320 before casting a spell that costs 270, 350 after);
-- when it ends at a low pool, the pool goes deeply negative (measured: 52 becomes -247.77)
-  and stays unusable until regeneration climbs back through the overdraft.
-
-So the fix matters most for builds like this one. It does the same thing for any change of
-maximum magicka, from a +10 ring to a potion, but the size of the problem scales with the
-size of the swing.
-
-It also changes what refills the pool. With the fix there is no free refill on activation,
-so regeneration does most of the refilling, alongside potions and other restore effects,
-and regeneration grows with the square of Willpower: 11.00 /s at Willpower 100, 22.50 /s at 150, 38.00 /s at 200, halved in combat
-([UESP, Willpower](https://en.uesp.net/wiki/Oblivion:Willpower); [`docs/SPEC.md`](docs/SPEC.md)
-section 10.7). `[DEDUCTION]`: on a build like this one, fortifying Willpower is the main
-lever on the cost of the fix.
-
-## How this project is made
-
-Every line of code and documentation in this repository was written by Claude, Anthropic's
-AI model. I do not write or edit the code. That does not make it a prompt-and-hope project:
-the AI writes, I direct, and nothing ships on its word alone.
-
-- **Scope is mine.** What the plugin does and refuses to do: the player only, no hooks and
-  no code patches, an ASI plugin rather than an OBSE one, which symptoms to fix and which to
-  leave out.
-- **Decisions are mine.** Design choices come to me with their trade-offs, and I pick: the
-  correction model, the shipped defaults, what goes into each version.
-- **Iterations are mine.** Each version has one stated purpose, and the next one starts
-  from what the previous one showed in game. Nothing is committed, pushed or published
-  without my go-ahead.
-- **Testing is mine.** Claude can build the plugin but cannot run the game. Every in-game
-  result here, including the 4 h 37 min validation of 0.9.1, comes from a session I played
-  and a log I sent back.
-- **Claims are checked.** Claude has to back every game-mechanics claim with a source (UESP,
-  a Nexus page, source code) or a measured log, and tag inferences `[DEDUCTION]`. When a
-  claim turned out wrong, it was withdrawn in the open: [`docs/SPEC.md`](docs/SPEC.md) and
-  [`docs/FIELD-JOURNAL.md`](docs/FIELD-JOURNAL.md) keep the withdrawn hypotheses next to
-  their corrections.
-
-The rules Claude works under are in [`AGENTS.md`](AGENTS.md), the same file any other
-contributor reads. Commits written by Claude carry a `Co-Authored-By: Claude` trailer.
-
 ## The problem
 
-The engine does not store your current magicka. It stores your maximum and a deficit
-(a float that is zero or negative), and computes `current = maximum + deficit` whenever it
-needs the value. Nothing adjusts the deficit when the maximum changes, and nothing clamps
-the result. Three symptoms follow from that one defect:
+Nothing adjusts the deficit when the maximum changes, and nothing clamps the result. Three
+symptoms follow from that one defect:
 
 - **Free magicka on activation.** Casting Fortify Magicka or Fortify Intelligence raises
-  your current magicka by the full amount. At 100/300, a +300 buff gives 400/600.
-- **The full magnitude is taken back on expiry**, even if you were nowhere near full.
-- **Negative magicka.** When a buff ends while your pool is low, current magicka goes
-  below zero: at 100/600, the buff ending leaves you at -200/300, unable to cast until
+  current magicka by the full amount. At 100/300, a +300 buff gives 400/600.
+- **The full magnitude is taken back on expiry**, even far from a full pool.
+- **Negative magicka.** When a buff ends while the pool is low, current magicka goes below
+  zero: at 100/600, the buff ending leaves -200/300, and nothing can be cast until
   regeneration climbs back to zero.
 
 The intended model is a glass of water:
@@ -124,32 +50,137 @@ The intended model is a glass of water:
 350/600, buff ends   ->  300/300   (vanilla: 50/300)
 ```
 
-This is a balance change, not only a bug fix: free magicka on activation is gone, and so
-are the exploits that rely on negative magicka. The `.conf` explains what that costs the
-player, and `iPreset = 1` keeps vanilla behaviour except for the floor at zero.
+### What the fix costs
+
+It is a fix, and like any fix that closes an exploit, it costs something to the players
+who used it. UESP documents the free magicka as a mechanic players use on purpose, "spell
+chaining", which allows "the player to cast the same spell infinitely"
+([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making#Spell_Chaining)). With
+the fix, free magicka on activation is gone, and so are the exploits that rely on negative
+magicka. Regeneration and restore effects become
+what refills the pool, and regeneration grows with the square of Willpower:
+`2 x (W/50)^2 + 1.5 x (W/50)` per second, so 11.00 /s at Willpower 100, 22.50 /s at 150 and
+38.00 /s at 200, halved in combat. That is the formula of UESP's Willpower page, the one the
+measurement confirms; two other UESP pages give different ones
+([UESP, Willpower](https://en.uesp.net/wiki/Oblivion:Willpower); [`docs/SPEC.md`](docs/SPEC.md)
+sections 3.3 and 10.7). `[DEDUCTION]`: for a mage relying on
+fortify spells, fortifying Willpower is the main lever on that cost.
+
+`iPreset = 1` keeps vanilla behaviour except for the floor at zero. It is not
+balance-neutral: the free magicka is still granted, and the debt it leaves at expiry is
+forgiven ([`docs/SPEC.md`](docs/SPEC.md) section 4.4).
+
+## Why this exists
+
+This plugin was born from an end-game mage build: custom spells and enchanted equipment
+(amulets, rings, clothing) that push Intelligence, Willpower and the magic skills well past
+100, with the spells recast every time they expire. Two mods by Baestus are what make such
+a build worth playing, because the base game clamps values above 100 in the formulas that
+matter:
+
+- [**Skill Damage Scaling Cap Remover**](https://github.com/Baestus/OBSE64_Skill_Damage_Scaling_Cap_Remover)
+  (Nexus [1846](https://www.nexusmods.com/oblivionremastered/mods/1846)). The game caps
+  skills at 100 in `luck_skill_modifier`; the mod patches that cap out and hooks the
+  spell cost formula. A fortified skill above 100 keeps lowering spell costs, as
+  `0.2 x base x 100 / skill`, instead of stopping at the vanilla floor of 20 % of the base
+  cost, and keeps raising damage.
+- [**Attribute Scaling Cap Remover**](https://github.com/Baestus/OBSE64_Attribute_Scaling_Cap_Remover)
+  (Nexus [2068](https://www.nexusmods.com/oblivionremastered/mods/2068)). Attributes above
+  100 count in the damage formula instead of being clamped to 100.
+
+Their source code was also this plugin's starting point; see [Credits](#credits).
+
+My view is that those two mods and this one are fixes, not rebalances. The game lets a mage
+push attributes and skills far past 100 through spells and enchantments, then either clamps
+them at 100 in its formulas or, for magicka, moves the maximum without rebasing the pool.
+The end-game mage looks like a case the game was not thought through for, or not played
+long enough with. That is an opinion: whether the designers meant any of it is not
+documented.
+
+Neither mod lets a *base* skill or attribute level past 100. Neither touches maximum
+magicka or regeneration either: 1846's source hooks only the cost formula, and 2068's
+README describes the damage formula only. Those two did not need uncapping. Intelligence
+above 100 already adds 2 magicka per point in the base game
+([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making)), and regeneration
+was measured following an effective Willpower of 110, not a capped 100
+([`docs/SPEC.md`](docs/SPEC.md) section 3.3). `[DEDUCTION]`: since neither mod touches
+regeneration, that is the base game's behaviour. Details and sources:
+[`docs/SPEC.md`](docs/SPEC.md) sections 4.7.3 and 10.7.
+
+The result is a magicka pool that swings by hundreds of points every time a buff is cast or
+expires. On the test character, one Fortify Intelligence 100 + Fortify Magicka 100 spell
+takes maximum magicka from 320 to 620 for 55 seconds, then back, and is recast over and
+over. That is where the engine's bookkeeping defect, harmless on a +10 ring, becomes the
+main thing happening to the magicka bar:
+
+- the buff refills the pool for free when it starts, so the spell more than pays for itself
+  (measured: 320 before casting a spell that costs 270, 350 after);
+- when it ends at a low pool, the pool goes deeply negative (measured: 52 becomes -247.77)
+  and stays unusable until regeneration climbs back through the overdraft.
+
+So the fix matters most for builds like this one. It does the same thing for any change of
+maximum magicka, from a +10 ring to a potion, but the size of the problem scales with the
+size of the swing.
 
 ## How it works
 
-The plugin runs on its own thread and polls the player object. It watches the
-attribute-value modifier arrays of the player (magic, script and game modifiers;
-Intelligence and Magicka), predicts the change of maximum as
-`delta = 2 x delta(Intelligence) + delta(Magicka)`, and on each transition writes
-`deficit' = min(deficit - delta, 0)` to `PlayerCharacter + 0x6B8`, then reads it back.
+The plugin runs on its own thread and polls the player object about 60 times a second. It
+watches the attribute modifiers of the player (the magic, script and game modifier arrays,
+for Intelligence and Magicka) and predicts each change of maximum as
 
-The correction is relative, so it is only right if the game did not already adjust the
-deficit itself. That was measured on the build above: it does not. The plugin keeps
-checking anyway. Changes that cost nothing at the moment they happen (a buff expiring, an
-enchanted item equipped or removed) show the game's own behaviour, and each one is compared
-with that assumption. If a game update ever fixes the bug, the log says so in capitals,
-because the plugin would then be subtracting the change twice. `iEnginePolicy` controls
-this; see [`docs/SPEC.md`](docs/SPEC.md) section 5.
+```
+delta = 2 x delta(Intelligence) + delta(Magicka)
+```
 
-The model itself is `src/MagickaMath.h`; when to apply it is `src/Corrector.h`. Both are
-free of any Windows dependency and covered by host unit tests.
+which holds above Intelligence 100 too
+([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making)). On each transition
+it writes `deficit' = min(deficit - delta, 0)`, then reads it back. That one rule covers the
+three cases: the pool keeps its water when the glass grows, keeps it when the glass
+shrinks above the water line, and is left full when the water no longer fits.
 
-Offsets come from the reverse-engineered
-[commonlibob64](https://github.com/libxse/commonlibob64) headers
-(`include/RE/P/PlayerCharacter.h`) and were confirmed in game on the build above.
+The rule is relative, so it is only right if the game did not already adjust the deficit
+itself. That was measured on the build above: it does not. The plugin keeps checking
+anyway. Changes that cost nothing at the moment they happen (a buff expiring, an enchanted
+item equipped or removed) show the game's own behaviour, and each one is compared with that
+assumption. If a game update ever fixes the bug, the log says so in capitals, because the
+plugin would then be subtracting the change twice. `iEnginePolicy` controls this; see
+[`docs/SPEC.md`](docs/SPEC.md) section 5.
+
+The model is `src/MagickaMath.h`; when to apply it is `src/Corrector.h`. Both are free of
+any Windows dependency and covered by host unit tests that replay the measured transitions.
+
+## Status
+
+**Validated in game** with version 0.9.1, the first that writes:
+
+- **6 August 2026**: one continuous 4 h 37 min session, 938,783 polls, 16 transitions, 14
+  writes, no failure, no error line, no crash. Current magicka was preserved across every
+  change of maximum, to within one frame of regeneration. Four transitions would otherwise
+  have left the pool below zero, down to -202.98, for 641.35 points of cumulative
+  overdraft; on the way up, 2,120 points of free magicka were refused. An Intelligence ring
+  behaves exactly like a spell, and reloading a save is handled.
+- **28 August 2026**: 1 h 37 min, 17 transitions, 10 writes, no failure. It added a cast at
+  95 % magnitude with armor worn, an item swap, and what reads as a Drain Magicka.
+
+Every number is in [`docs/SPEC.md`](docs/SPEC.md), sections 4.6 to 4.8. Since 0.9.1 the
+correction itself has not changed, only the calibration bookkeeping, the `.conf` text and
+the log. The development version, 1.0.0-dev, makes the log describe the game build, the
+loaded mods and the character from its first lines; it has not been run in game yet.
+
+**Open:**
+
+- **Not yet tested in game**: removing a Fortify Intelligence/Magicka item at a partial
+  pool, ten activation/expiry loops in a row, potions, altars and blessings, levelling up.
+- **A design question**: the fix cancels a drain's effect on current magicka. Whether it
+  should is open ([`docs/SPEC.md`](docs/SPEC.md) section 10.5).
+
+That is the whole story for a reader who is not going to build or test the plugin. What
+follows is for developers: internals, test builds, build and release. The method behind
+the project and the credits are at the end.
+
+---
+
+## Internals
 
 ### How memory is accessed
 
@@ -160,42 +191,117 @@ That matters because the plugin is built with MinGW-w64, which has no structured
 handling: an access violation would take the game down with it. That is exactly how 0.1.1
 crashed; [`docs/FIELD-JOURNAL.md`](docs/FIELD-JOURNAL.md) has the dump analysis.
 
+### Finding the player
+
 The player is a singleton, so a pointer to it lives in a static slot in the executable's
 own data sections. The plugin scans those sections (about 8 MB, never decommitted) for a
 pointer to an object whose first field is the `PlayerCharacter` vtable, found through RTTI.
-A chunked heap sweep remains as an opt-in fallback (`bHeapScan`).
+A chunked heap sweep remains as an opt-in fallback (`bHeapScan`). The object's vtable
+pointer is re-verified before every sample, and non-finite or implausible values are
+discarded, because the plugin's thread is not the game thread and reads can tear.
 
-The game's own `GetActorFloatValue` would give the absolute maximum, but calling it from the
-plugin's thread hangs or faults inside the game ([`docs/SPEC.md`](docs/SPEC.md) section 9.1),
-so `bCallVirtuals` stays 0 and the plugin only ever sees changes of the maximum.
+### What it can and cannot see
 
-## Status
+The offsets come from the reverse-engineered
+[commonlibob64](https://github.com/libxse/commonlibob64) headers and were confirmed in game
+on the build above ([`docs/SPEC.md`](docs/SPEC.md) chapter 3). The absolute maximum is not
+among them: it was not found in the part of the player object that was searched
+([`docs/SPEC.md`](docs/SPEC.md) section 3.2), and the game's own `GetActorFloatValue`,
+which would give it, hangs or faults when called from the plugin's thread
+([`docs/SPEC.md`](docs/SPEC.md) section 9.1). So `bCallVirtuals` stays 0, and the plugin
+only ever sees changes of the maximum, which is why the rule above is relative.
 
-Validated in game on 6 August 2026 (version 0.9.1, the first version that writes): one
-continuous 4 h 37 min session, 938,783 polls, 16 transitions, 14 writes, **no failures, no
-error lines, no crash**. The two transitions without a write are the two where the correct
-answer is to do nothing.
+Since 1.0.0-dev the plugin also reads, without writing, the character's level, base
+attributes and base skills from the player's base form, after checking its form IDs and
+vtable. Those offsets are not validated in game yet ([`docs/SPEC.md`](docs/SPEC.md) section
+10.8); nothing in the correction depends on them.
 
-Current magicka was preserved across every change of maximum, to within one frame of
-regeneration. Four of those transitions would otherwise have left the pool below zero, down
-to -202.98, for 641.35 points of cumulative overdraft. On the way up, 2,120 points of free
-magicka were refused. Enchanted items are covered: an Intelligence ring behaves exactly
-like a spell and is handled by the same rule. Reloading a save is handled: the plugin
-notices, re-primes, and finds the player object again.
+## Running a test build
 
-Since 0.9.1 the correction itself has not changed: only the calibration bookkeeping, the
-`.conf` text and the log. The current development version, 1.0.0-dev, adds the startup
-summary and the character data to the log; it has not been run in game yet. Every number is
-in [`docs/SPEC.md`](docs/SPEC.md), sections 4.6 and 4.7.
+Players should use the Nexus release. A test build is for checking a change in game.
 
-A second 0.9.1 session, on 28 August 2026 (1 h 37 min, 17 transitions, 10 writes, no
-failures), added a cast at 95 % magnitude with armor worn and what reads as a Drain
-Magicka. The fix cancels a drain's effect on current magicka; whether it should is an
-open design question ([`docs/SPEC.md`](docs/SPEC.md) sections 4.8 and 10.5).
+1. You need an **ASI loader**, usually
+   [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (x64). This is
+   **not** an OBSE64 plugin and does not need OBSE64.
+2. Copy `MagickaPoolFix.asi` into a folder your ASI loader scans. Ultimate ASI Loader reads
+   `.asi` files from the folder holding the loader DLL and from its `scripts`, `plugins` and
+   `update` subfolders. On Steam, the usual place is
+   `OblivionRemastered\Binaries\Win64\plugins\`.
 
-**Not yet tested in game:** removing a Fortify Intelligence/Magicka item at a partial pool,
-ten activation/expiry loops in a row, potions, altars and blessings, and levelling up.
-[`docs/SPEC.md`](docs/SPEC.md) chapters 8 and 10 list them.
+   **Put exactly one copy in exactly one folder.** A copy in two scanned folders is loaded
+   twice; a single-instance mutex stops the second one and the log names the duplicate.
+3. Launch the game once. `MagickaPoolFix.conf` and `MagickaPoolFix.log` are created **next
+   to the .asi**. The plugin never overwrites an existing `.conf`, so replace it along with
+   the `.asi` when its text has changed. If that folder is not writable, the log falls back
+   to `%TEMP%\MagickaPoolFix.log` and says so.
+4. The `.conf` documents every option in place. Everything a regular player needs is above
+   the `A D V A N C E D` banner.
+
+**Back up your saves first.** The plugin does not repair a save whose magicka was already
+corrupted by the vanilla bug.
+
+Steam and Game Pass ship separate compilations. Nothing in the plugin is tied to the Steam
+executable's name (it finds the game module with `GetModuleHandleW(nullptr)` and the
+vtable through RTTI), but the offsets were only confirmed on the Steam build. Game Pass is
+untested.
+
+### Settings you might change
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `iPreset` | `2` | `0` off (log only), `1` vanilla plus a floor at zero, `2` glass of water, `3` custom |
+| `bDryRun` | `0` | `1` computes and logs every decision but writes nothing |
+| `iEnginePolicy` | `1` | `1` correct (measured default), `0` work it out from what happens, `2` never correct |
+| `bCallVirtuals` | `0` | **Leave at 0.** Calling the game's `GetActorFloatValue` from this thread hangs or crashes the game ([`docs/SPEC.md`](docs/SPEC.md) section 9.1) |
+| `iDumpKey` | `0x79` (F10) | Writes a memory dump of the player object to the log. Never bind F5, F8 or F9 (quick save and quick load) |
+| `iLevel` | `2` | `3` adds the full startup detail and the probe's memory dumps |
+
+### The log
+
+`MagickaPoolFix.log`, next to the .asi, truncated at every start and never rotated. It is
+opened with `FILE_SHARE_DELETE`, so it can be deleted or renamed at any time, even while
+the game is running.
+
+The first lines are what a bug report needs:
+
+1. a one-line summary: version, `ACTIVE` or `DRY RUN`, build time, the game executable and
+   its PE timestamp (and whether it is the validated build), preset, engine policy, and
+   whether the `.conf` was found;
+2. the loaders and mods in the game process, each with the PE timestamp of its file;
+3. the settings that differ from the defaults;
+4. once a save is loaded, the character: level, base attributes and skills with their
+   modifier totals (`PLAYER` lines).
+
+After that, each change of maximum produces a `DECISION` line, and every write is followed
+by `WRITE OK` or `WRITE FAILED`. Level-ups, base attribute changes and skill-ups get a line
+each. A status line is written at most once a minute. Paths are written with the user's
+profile folder replaced by `%USERPROFILE%`.
+
+## Compatibility
+
+- **The two uncappers by Baestus** (see [Why this exists](#why-this-exists)): loaded
+  throughout the in-game validation. They patch the spell cost and damage code; this plugin
+  hooks nothing, patches no code, and writes one data field of the player object, so the two
+  never touch the same address.
+- **UE4SS**: present during the in-game validation.
+- **Mods that also ship a `version.dll`**, for example
+  [OblivionRemasteredPerformanceFix](https://github.com/LTSharpe/OblivionRemasteredPerformanceFix):
+  only one file can be named `version.dll`. Ultimate ASI Loader also works under other
+  names; the Steam executable imports `winmm.dll`, so renaming the loader to `winmm.dll`
+  frees `version.dll` for the other mod. Not yet tested in game with this plugin.
+
+## Limitations
+
+- **Tied to one build.** Offsets are confirmed for the executable with PE timestamp
+  `0xF19077A4`. The log's first line says whether the running game is that build. After a
+  game update, check the log before trusting the plugin.
+- **The player only.** NPC magicka is not touched.
+- **Permanent attribute changes are not corrected.** A level-up changes the base attribute,
+  not a modifier, so the rule does not apply to it. Since 1.0.0-dev the log reports it.
+  [`docs/SPEC.md`](docs/SPEC.md) section 10.3 explains when that can matter.
+- **Drains are cancelled like any other change.** UESP documents a Drain Magicka as taking
+  current magicka; with the fix it does not, on a pool that is not full. An open design
+  question ([`docs/SPEC.md`](docs/SPEC.md) section 10.5).
 
 ## Repository layout
 
@@ -208,12 +314,13 @@ src/
   Corrector.h              engine-policy calibration + the write decision, no Windows dependency
   HypothesisCalibrator.h   current-versus-maximum resolver, no Windows dependency
   ModelWatch.h             watches the modifier totals, reports each transition
+  PlayerStats.h            the character data in the log, change detection, path anonymisation
   PeUtil.h                 PE section walk, committed-page snapshot, checked reads and writes
   Rtti.h                   MSVC RTTI walk: mangled name -> locator -> vtable
   Probe.h                  hex dump, float watch, edge-triggered key
   VirtualCallGuard.h       the guard around the (disabled) virtual call
   Plugin.cpp               DllMain, init thread, discovery, observation and correction loop
-tests/                     host unit tests (math, calibration, corrector)
+tests/                     host unit tests (math, calibration, corrector, stats)
 tools/
   gen_conf.py              writes the default .conf from Config.h and checks its structure
   package.sh               builds the release zip
@@ -242,6 +349,9 @@ checks (`tools/gen_conf.py`), or if the plugin imports anything other than `KERN
 `msvcrt` and `USER32`. The C runtime is linked statically, so no Visual C++ redistributable
 is needed. `package.sh` zips the built plugin, its `.conf` and every git-tracked source and
 doc file.
+
+Builds are not byte-reproducible: the plugin embeds `__DATE__` and `__TIME__` so every log
+states which binary produced it. Each release zip carries a `SHA256SUMS` for its own files.
 
 ### With CMake (IDEs, MSVC)
 
@@ -273,16 +383,13 @@ anything you report.
 Every push and pull request is built by GitHub Actions, including in a fork that enables
 Actions. The run's `MagickaPoolFix` artifact is the same zip a release would contain.
 
-Builds are not byte-reproducible: the plugin embeds `__DATE__` and `__TIME__` so every log
-states which binary produced it. Each release zip carries a `SHA256SUMS` for its own files.
-
 ## Testing
 
 The unit tests replay the transitions measured in game, so a regression shows up against
-field data rather than invented numbers. Everything else needs the game: nothing here can
-run it, and every in-game claim in [`docs/SPEC.md`](docs/SPEC.md) comes from a log. A test
-session changes one thing at a time, starts from backed-up saves, and ends with the log
-being read against the scenario. [`AGENTS.md`](AGENTS.md) has the procedure.
+field data rather than invented numbers. Everything else needs the game: every in-game
+claim in [`docs/SPEC.md`](docs/SPEC.md) comes from a log. A test session changes one thing
+at a time, starts from backed-up saves, and ends with the log being read against the
+scenario. [`AGENTS.md`](AGENTS.md) has the procedure.
 
 ## Releasing
 
@@ -295,102 +402,51 @@ being read against the scenario. [`AGENTS.md`](AGENTS.md) has the procedure.
 4. Tag `v<version>`. For `v*` tags, GitHub Actions checks that the tag matches
    `MPF_PLUGIN_VERSION` and attaches the zip to a **draft** release, published by hand.
 
-## Install (for testing)
+## Contributing
 
-1. You need an **ASI loader**, usually
-   [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (x64). This is
-   **not** an OBSE64 plugin and does not need OBSE64.
+Read [`AGENTS.md`](AGENTS.md) first: it holds the rules every contributor works under,
+human or AI, and the checklists for building and testing. In short: every claim about the
+game needs a source or a log, nothing is copied from projects whose license does not allow
+it, and a change that touches game memory is not done until a session in game says so.
 
-2. Copy `MagickaPoolFix.asi` into a folder your ASI loader scans. Ultimate ASI Loader reads
-   `.asi` files from the folder holding the loader DLL and from its `scripts`, `plugins` and
-   `update` subfolders. On Steam, the usual place is
-   `OblivionRemastered\Binaries\Win64\plugins\`.
+A bug report needs the **whole** `MagickaPoolFix.log`, from its first line: that is where
+the game build, the loaded mods, the changed settings and the character are.
 
-   **Put exactly one copy in exactly one folder.** A copy in two scanned folders is loaded
-   twice; a single-instance mutex stops the second one and the log names the duplicate.
+---
 
-3. Launch the game once. `MagickaPoolFix.conf` and `MagickaPoolFix.log` are created **next
-   to the .asi**. The plugin never overwrites an existing `.conf`, so delete the old one
-   when upgrading if you want the new defaults and text. If that folder is not writable, the
-   log falls back to `%TEMP%\MagickaPoolFix.log` and says so.
+## How this project is made
 
-4. Read the `.conf`. Every option is explained in place, including what the fix costs in
-   balance terms. Everything a regular player needs is above the `A D V A N C E D` banner.
+Every line of code and documentation in this repository was written by Claude, Anthropic's
+AI model. I do not write or edit the code. That does not make it a prompt-and-hope project:
+the AI writes, I direct, and nothing ships on its word alone.
 
-**Back up your saves before installing anything that writes to game memory.** The plugin
-does not repair a save whose magicka was already corrupted by the vanilla bug.
+- **Scope is mine.** What the plugin does and refuses to do: the player only, no hooks and
+  no code patches, an ASI plugin rather than an OBSE one, which symptoms to fix and which to
+  leave out.
+- **Decisions are mine.** Design choices come to me with their trade-offs, and I pick: the
+  correction model, the shipped defaults, what goes into each version.
+- **Iterations are mine.** Each version has one stated purpose, and the next one starts
+  from what the previous one showed in game. Nothing is committed, pushed or published
+  without my go-ahead.
+- **Testing is mine.** Claude can build the plugin but cannot run the game. Every in-game
+  result here comes from a session I played and a log I sent back.
+- **Claims are checked.** Claude has to back every game-mechanics claim with a source (UESP,
+  a Nexus page, source code) or a measured log, and tag inferences `[DEDUCTION]`. When a
+  claim turned out wrong, it was withdrawn in the open: [`docs/SPEC.md`](docs/SPEC.md) and
+  [`docs/FIELD-JOURNAL.md`](docs/FIELD-JOURNAL.md) keep the withdrawn hypotheses next to
+  their corrections.
 
-The plugin finds the game module through `GetModuleHandleW(nullptr)` and the
-`PlayerCharacter` vtable through RTTI at runtime, so nothing is tied to the Steam executable
-name. But Steam and Game Pass ship separate compilations, and the offsets were only
-confirmed on the Steam build. Game Pass is untested.
-
-### Settings you might change
-
-| Setting | Default | Meaning |
-|---|---|---|
-| `iPreset` | `2` | `0` off (log only), `1` vanilla plus a floor at zero, `2` glass of water, `3` custom |
-| `bDryRun` | `0` | `1` computes and logs every decision but writes nothing |
-| `iEnginePolicy` | `1` | `1` correct (measured default), `0` work it out from what happens, `2` never correct |
-| `bCallVirtuals` | `0` | **Leave at 0.** Calling the game's `GetActorFloatValue` from this thread hangs or crashes the game ([`docs/SPEC.md`](docs/SPEC.md) section 9.1) |
-| `iDumpKey` | `0x79` (F10) | Writes a memory dump of the player object to the log. Never bind F5, F8 or F9 (quick save and quick load) |
-
-### The log
-
-`MagickaPoolFix.log`, next to the .asi, truncated at every start and never rotated. It is
-opened with `FILE_SHARE_DELETE`, so you can delete or rename it at any time, even while the
-game is running.
-
-The first lines are what a bug report needs:
-
-1. a one-line summary: version, `ACTIVE` or `DRY RUN`, build time, the game executable and
-   its PE timestamp (and whether it is the validated build), preset, engine policy, and
-   whether the `.conf` was found;
-2. the loaders and mods in the game process, each with the PE timestamp of its file;
-3. the settings that differ from the defaults;
-4. once a save is loaded, the character: level, base attributes and skills with their
-   modifier totals (`PLAYER` lines, not yet validated in game: [`docs/SPEC.md`](docs/SPEC.md)
-   section 10.8).
-
-After that, each change of maximum produces a `DECISION` line, and every write is followed
-by `WRITE OK` or `WRITE FAILED`. Level-ups, base attribute changes and skill-ups get a line
-each. A status line is written at most once a minute. `iLevel = 3` adds the full startup
-detail. Paths are written with the user's profile folder replaced by `%USERPROFILE%`.
-
-## Compatibility
-
-- **The two uncappers by Baestus** (see [Why this exists](#why-this-exists)): loaded
-  throughout the in-game validation. They patch the spell cost and damage code; this plugin
-  hooks nothing, patches no code, and writes one data field of the player object, so the two
-  never touch the same address.
-- **UE4SS**: present during the in-game validation.
-- **Mods that also ship a `version.dll`**, for example
-  [OblivionRemasteredPerformanceFix](https://github.com/LTSharpe/OblivionRemasteredPerformanceFix):
-  only one file can be named `version.dll`. Ultimate ASI Loader also works under other
-  names; the Steam executable imports `winmm.dll`, so renaming the loader to `winmm.dll`
-  frees `version.dll` for the other mod. Not yet tested in game with this plugin.
-
-## Limitations
-
-- **Tied to one build.** Offsets are confirmed for the executable with PE timestamp
-  `0xF19077A4`. The log prints the module name and PE timestamp so each log identifies its
-  build. After a game update, check the log before trusting the plugin.
-- **The player only.** NPC magicka is not touched.
-- **Permanent attribute changes are not seen.** A level-up changes the base attribute, not
-  a modifier, so the plugin does not observe it. [`docs/SPEC.md`](docs/SPEC.md) section 10.3
-  explains when that can matter, and what is still unmeasured.
-- **Cross-thread reads can tear.** The plugin's thread is not the game thread. Non-finite
-  and implausible values are discarded, the object's vtable pointer is re-verified before
-  each sample, and every write is read back.
+The rules Claude works under are in [`AGENTS.md`](AGENTS.md), the same file any other
+contributor reads. Commits written by Claude carry a `Co-Authored-By: Claude` trailer.
 
 ## Credits
 
 - **[commonlibob64](https://github.com/libxse/commonlibob64)** (libxse), the
   reverse-engineered layout of the game's classes. Every memory offset this plugin uses
-  and the actor-value indices come from its headers, and each offset was confirmed in game
-  before the plugin relied on it ([`docs/SPEC.md`](docs/SPEC.md) section 3.4). The plugin
-  does not build against it, and contains none of its code: only offsets and indices,
-  quoted with their source. commonlibob64 is GPL-3.0.
+  comes from its headers. The offsets the correction relies on were confirmed in game
+  ([`docs/SPEC.md`](docs/SPEC.md) chapter 3); those of the character data are still being
+  validated (section 10.8). The plugin does not build against it and contains none of its
+  code: only offsets, quoted with their source. commonlibob64 is GPL-3.0.
 - **Baestus**, author of the two uncappers this plugin was born alongside:
   [Skill Damage Scaling Cap Remover](https://github.com/Baestus/OBSE64_Skill_Damage_Scaling_Cap_Remover)
   (Nexus [1846](https://www.nexusmods.com/oblivionremastered/mods/1846)) and
@@ -406,8 +462,12 @@ detail. Paths are written with the user's profile folder replaced by `%USERPROFI
   which loads the plugin.
 - **[UE4SS](https://github.com/UE4SS-RE/RE-UE4SS)**, whose crash dumps were how the early
   crashes were traced.
-- **[UESP](https://en.uesp.net/wiki/Oblivion:Oblivion)**, the main source for the game
-  mechanics described in these docs.
+- **[UESP](https://en.uesp.net/wiki/Oblivion:Oblivion_Remastered)**, the main source for
+  the game mechanics described in these docs, and its **Construction Set wiki**, whose
+  [Stats List](https://cs.uesp.net/wiki/Stats_List) gives the actor-value indices. UESP
+  documents Remastered alongside the original game; [`docs/SPEC.md`](docs/SPEC.md) chapter
+  12 says which statement comes from which, and where its pages disagree with each other
+  or with a measurement.
 
 ## License
 

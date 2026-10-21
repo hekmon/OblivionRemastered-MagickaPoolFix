@@ -177,8 +177,9 @@ R"CONF(; =======================================================================
 ;
 ;  WHAT IT COSTS - READ THIS BEFORE COMPLAINING
 ;  --------------------------------------------
-;  Preset 2 removes free Magicka on activation. That is a real balance change,
-;  not just a bug fix. Two consequences you should know about:
+;  Preset 2 removes free Magicka on activation. It is a fix, and like any fix
+;  that closes an exploit, it changes the balance for whoever relied on it.
+;  Two consequences you should know about:
 ;
 ;  * You now need a preparation window. Buff your pool, wait for it to fill,
 ;    then strike. In Oblivion Remastered, regeneration depends only on
@@ -211,11 +212,13 @@ R"CONF(; =======================================================================
 ;    only fortify Magicka, filling +300 in combat at Willpower 100 takes about
 ;    55 seconds and your buff will expire long before that.
 ;
-;  * Two known exploits stop working, because both depend on negative Magicka:
-;    the Fortify Magicka + Drain Magicka spell-chaining loop, and the variant
-;    that pushes maximum Magicka past 1500 permanently.
-;      https://en.uesp.net/wiki/Oblivion:Spell_Making
-;    If you use those, stay on preset 1.
+;  * Spell chaining stops working. UESP documents loops built on the free
+;    Magicka of Fortify effects, and on Drain Magicka turning a negative pool
+;    back to zero; one variant keeps maximum Magicka above 1500 while it runs.
+;      https://en.uesp.net/wiki/Oblivion:Spell_Making#Spell_Chaining
+;    Preset 2 removes the free Magicka. Preset 1 keeps it, but by never letting
+;    the pool go negative it also breaks the variants that need a negative
+;    pool. If you rely on those, set iPreset = 0.
 ;
 ;  If none of that appeals to you, set iPreset = 1: it only stops current
 ;  Magicka from going negative and changes nothing else.
@@ -241,7 +244,8 @@ R"CONF(; =======================================================================
 ;   2 = Glass  (default)
 ;       The full model described above. Current Magicka is preserved when the
 ;       maximum changes, the overflow is spilled, and the floor at zero
-;       applies. This is a deliberate balance change; read "WHAT IT COSTS".
+;       applies. It closes the free-Magicka exploit, which changes the balance;
+;       read "WHAT IT COSTS".
 ;
 ;   3 = Custom
 ;       Read the four booleans in [Magicka] below.

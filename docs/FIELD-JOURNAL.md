@@ -2319,3 +2319,91 @@ is a deficit before a 2-point change.
 
 Every expiry and the item swap happened with the pool full, so SPEC chapter 8 scenarios 5
 (equip/unequip at a partial pool) and 6 (ten loops with a drift check) are still open.
+
+## 21 October 2026 — UESP pages checked against Remastered
+
+Prompted by the player's question: is `Oblivion:Oblivion`, the page the README credited,
+about the original game rather than Remastered? It is. UESP documents Remastered inside
+the same `Oblivion:` namespace, through a hub page (`Oblivion:Oblivion_Remastered`),
+"Remastered" pages, "Oblivion Remastered" sections and inline notes. Every UESP page cited
+in the repository was re-read in raw wikitext and classified; the result is in
+`docs/SPEC.md` chapter 12.
+
+### A misquotation, withdrawn
+
+`SPEC.md` §2 and §12 said UESP's Spell Making page describes Fortify Magicka as *not*
+adding current magicka, unlike Fortify Intelligence. The page ("Spell Chaining", original
+game) says the opposite:
+
+- Fortify Magicka adds its magnitude to both current and maximum;
+- Fortify Intelligence adds twice its magnitude to both;
+- Drain Magicka removes from both;
+- on expiry, the two Magicka effects cannot take current magicka below zero, while
+  Fortify Intelligence can.
+
+The page presents the free magicka as an exploit, spell chaining. §2 now states this and
+says the mod departs from it on purpose.
+
+### UESP contradicts itself on Remastered regeneration
+
+At effective Willpower 110, out of combat:
+
+| Page | Formula | Rate |
+|---|---|---:|
+| Willpower | `2 × (W/50)² + 1.5 × (W/50)` | 12.98 /s |
+| Magicka | `2 × (0.0003 W² + 0.015 W)` | 10.56 /s |
+| Remastered Changes | `0.02 W² + 0.015 W`, before the out-of-combat factor | 243.65 /s |
+
+Only the first matches the measurement of SPEC §3.3. The Magicka page's formula fits no
+vampirism stage either. Recorded in §3.3.
+
+### Two consequences for the design
+
+- **Drains**: UESP documents a Drain Magicka as taking current magicka. The fix changes
+  that on a pool that is not full. SPEC §10.5 now quotes the page; the decision belongs
+  to the player.
+- **A floor at zero**: if Remastered floored current magicka at zero on a Fortify Magicka
+  expiry or a drain, the engine would move the deficit itself, and the relative rule would
+  over-correct. The measurement of §4.1 rules this out for a combined expiry: 52.23 →
+  −247.77, which no order of applying a floor can produce. A Fortify Magicka alone
+  expiring at a low pool, and a drain on a nearly empty pool, remain to be measured. Added
+  to SPEC §10.5.
+
+### Also from this pass
+
+- **Spell Making, Remastered note**: one spell may now combine several Fortify Attribute
+  and Fortify Skill effects.
+- **Mastery following the base skill** comes from an original-game page with no Remastered
+  note: `[DEDUCTION]` for Remastered.
+- Three redirect URLs (`Oblivion:Drain`, `Oblivion:Spell_Effectiveness`, `Oblivion:Player`)
+  were replaced by their targets.
+
+## 21 October 2026 — one framing, and the source of Willpower 110
+
+### "Fix" or "balance change": one framing
+
+The README called the plugin "a balance change, not only a bug fix" in one place and "the
+fix" everywhere else, and the `.conf` said the same. The maintainer's position, now stated
+once in `SPEC.md` §2 and used everywhere: the defect is a bug and the plugin is a fix, and
+a fix that closes an exploit changes the balance for the players who used it. Whether the
+designers meant the side effect is not documented; UESP describes it as an exploit. The
+maintainer holds the same view of the two uncapper mods, written in the README as an
+opinion.
+
+### `.conf` advice corrected
+
+The `.conf` said the spell-chaining exploits that need a negative pool keep working under
+`iPreset = 1`. Preset 1 is the floor at zero, so they do not. The advice for someone who
+relies on them is now `iPreset = 0`. `[DEDUCTION]` from the preset's definition. The
+`.conf` also called the 1500-point variant permanent; UESP says the magicka "will never
+drop" while the loop runs.
+
+### Willpower 110 was not vampirism
+
+`SPEC.md` §3.3 explained the effective Willpower 110 of the regeneration measurement by
+the 50 % vampirism stage. The 0.4.0-probe entry of this journal records `+10.0000` on all
+eight attributes in the magic modifier array during that same run. Vampirism fortifies
+only Strength, Speed and Willpower (UESP). `[DEDUCTION]`: an item or effect giving +10 to
+every attribute, and no vampirism bonus active at that moment, since any stage would have
+given at least 14.03 /s. §3.3 corrected; the regeneration measurement and its formula are
+unaffected.
