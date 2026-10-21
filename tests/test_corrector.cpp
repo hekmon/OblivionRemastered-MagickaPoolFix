@@ -450,12 +450,43 @@ static void TestFieldCases()
     }
 }
 
+// The warning for an engine that moves the deficit on a decrease (a floor at zero).
+// Measured cases must stay silent; a synthetic floor must not.
+static void TestEngineMoveWarning()
+{
+    std::puts("\n-- engine moving the deficit on a decrease --------------------------");
+    const float eps = 0.01f;
+    // 28 Aug 2026, event 13: Intelligence -1 (max -2), regeneration +0.1373 in the poll.
+    Check("28 Aug event 13 (regen in the poll): silent",
+          mpf::EngineRaisedDeficitOnDecrease(-2.0f, -261.7483f, -261.6110f, eps), 0.0f);
+    // 28 Aug 2026, event 15: Magicka -22, regeneration +0.0238.
+    Check("28 Aug event 15 (drain, engine idle): silent",
+          mpf::EngineRaisedDeficitOnDecrease(-22.0f, -356.9238f, -356.9000f, eps), 0.0f);
+    // 6 Aug 2026 17:03:11: the -300 expiry the engine did not touch at all.
+    Check("6 Aug 17:03 expiry (deficit untouched): silent",
+          mpf::EngineRaisedDeficitOnDecrease(-300.0f, -567.769f, -567.769f, eps), 0.0f);
+    // A full pool losing its overflow: deficit 0 -> 0.
+    Check("full pool, overflow spilled: silent",
+          mpf::EngineRaisedDeficitOnDecrease(-300.0f, 0.0f, 0.0f, eps), 0.0f);
+    // Increases are not this check's business, even with a big move.
+    Check("increase with a large move: silent",
+          mpf::EngineRaisedDeficitOnDecrease(300.0f, 0.0f, -270.0f, eps), 0.0f);
+    // Synthetic floor: maximum 620 -> 520, current 50 would become -50; an engine
+    // flooring at zero sets the deficit to -520 instead of -570, a move of +50.
+    Check("synthetic floor at zero: reported (+50)",
+          mpf::EngineRaisedDeficitOnDecrease(-100.0f, -570.0f, -520.0f, eps), 50.0f);
+    // Just over what one stretched poll of regeneration explains.
+    Check("move of 5 points on a -22 change: reported",
+          mpf::EngineRaisedDeficitOnDecrease(-22.0f, -100.0f, -95.0f, eps), 5.0f);
+}
+
 int main()
 {
     TestCorrectDeficit();
     TestCalibration();
     TestDecision();
     TestFieldCases();
+    TestEngineMoveWarning();
     std::printf("\n%s\n", g_fail == 0 ? "all corrector tests passed"
                                       : "THERE WERE FAILURES");
     return g_fail == 0 ? 0 : 1;

@@ -900,6 +900,14 @@ player's first spell, or even indefinitely.
   verdict.
 - The "deficit under preservation" line is essential for diagnosis: it is what separates
   a spell's cost from compensation, as in §4.2.
+- Since 1.0.0-dev each transition also says which source moved, as the change of the
+  Intelligence and Magicka modifiers in the magic, script and game arrays. A spell or an
+  enchantment lands in the magic array, a script in the script array, the engine's own
+  adjustments in the game array.
+- A decrease on which the engine raised the deficit by more than regeneration explains
+  (2 points plus the tolerance of §5.4) produces an error line, `ENGINE MOVED THE DEFICIT`,
+  and raises the detail level for 200 lines. It is the signature of a floor at zero
+  applied by the engine (§10.5), under which the correction overshoots.
 - Automatic, temporary raising of the detail level after an abnormal event, then return
   to the configured level.
 - Line cap, so that a pathological loop does not fill the disk.
@@ -1212,7 +1220,18 @@ rules this out for a combined expiry: Fortify Intelligence 100 and Fortify Magic
 ending together took current magicka from 52.23 to −247.77. That is the full 300, and no
 order of applying the two with a floor gives that number. `[DEDUCTION]`: Remastered does
 not apply the floor. A **Fortify Magicka alone** expiring at a low pool, and a drain on a
-nearly empty pool, have not been measured.
+nearly empty pool, have not been measured. Since 1.0.0-dev such a case cannot go unnoticed:
+the log flags any decrease on which the engine raised the deficit (§6.6).
+
+What the log does not tell, and an investigation of drains would need:
+
+- whether current magicka would actually have gone below zero, because the absolute
+  maximum is not read (§10.2). Once the character data of §10.8 is validated, an estimate
+  becomes possible: `2 × (base Intelligence + modifier) + Magicka modifier + race and
+  birthsign bonuses`, to be checked once against the screen;
+- which effect caused a change: that needs the list of active effects, which the mod
+  does not read. The per-source breakdown (§6.6) only says spell or enchantment, script, or
+  engine.
 
 `[DEDUCTION]`: all of them go through the same modifier arrays, so the rule should apply
 as is. A level-up, on the other hand, raises the base attribute and not a modifier, and

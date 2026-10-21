@@ -114,6 +114,32 @@ inline float Tolerance(float deltaMax, float eps)
 }
 
 // ---------------------------------------------------------------------------
+// The engine moving the deficit on a decrease.
+//
+// The relative rule assumes the engine leaves the deficit alone when the maximum
+// moves (§4 of docs/SPEC.md). For the original game, UESP describes a floor at zero
+// when a Fortify Magicka ends or a Drain Magicka lands. If the Remastered engine
+// applies one, it raises the deficit itself on that decrease, and the correction,
+// computed from the deficit the engine left, grants the difference a second time
+// (docs/SPEC.md section 10.5). Not observed so far; this makes it impossible to miss.
+//
+// Regeneration also raises the deficit between two polls, so the threshold sits above
+// what it can explain: 38 points per second at Willpower 200 (docs/SPEC.md §10.7)
+// over a poll stretched to 50 ms is under 2 points. A restore effect landing in the
+// same poll would also trip it, which the log line says.
+inline constexpr float kEngineMoveFloor = 2.0f;
+
+// Returns the amount the engine raised the deficit by on a decrease, or 0 when the
+// transition is not a decrease or the movement stays within what regeneration explains.
+inline float EngineRaisedDeficitOnDecrease(float deltaMax, float deficitBefore,
+                                           float deficitAfter, float eps)
+{
+    if (!(deltaMax < 0.0f)) { return 0.0f; }
+    const float moved = deficitAfter - deficitBefore;
+    return moved > kEngineMoveFloor + Tolerance(deltaMax, eps) ? moved : 0.0f;
+}
+
+// ---------------------------------------------------------------------------
 // Policy calibration.
 class PolicyTracker {
 public:

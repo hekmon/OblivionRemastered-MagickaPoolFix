@@ -79,18 +79,46 @@ bool g_warnedPinned = false;
 // writes the script array, and the engine's own adjustments use the game array.
 // Maximum Magicka responds to the total, so a watcher that reads only one of the
 // three would misreport the moment two sources move in opposite directions.
-static bool TotalAvModifier(std::uintptr_t obj, int avIndex, float& out) {
-    out = 0.0f;
+// The three sources one by one, magic / script / game. A disabled array reads as 0.
+static bool ReadAvSources(std::uintptr_t obj, int avIndex, float out[3]) {
     const int bases[3] = { g_offMagicAV, g_offScriptAV, g_offGameAV };
-    for (const int base : bases) {
-        if (base <= 0) { continue; }
-        float v = 0.0f;
-        const unsigned off = static_cast<unsigned>(base + avIndex * 4);
-        if (!mpf::SafeRead(obj + off, v)) { return false; }
-        if (!std::isfinite(v)) { return false; }
-        out += v;
+    for (int i = 0; i < 3; ++i) {
+        out[i] = 0.0f;
+        if (bases[i] <= 0) { continue; }
+        const unsigned off = static_cast<unsigned>(bases[i] + avIndex * 4);
+        if (!mpf::SafeRead(obj + off, out[i])) { return false; }
+        if (!std::isfinite(out[i])) { return false; }
     }
     return true;
+}
+
+static bool TotalAvModifier(std::uintptr_t obj, int avIndex, float& out) {
+    float src[3];
+    if (!ReadAvSources(obj, avIndex, src)) { return false; }
+    out = src[0] + src[1] + src[2];
+    return true;
+}
+
+// Which source moved, for the two actor values the model watches. A spell or an
+// enchantment lands in the magic array, a quest or console script in the script
+// array, the engine's own adjustments in the game array. Telling them apart is the
+// first step in reading an unexpected change, a drain for instance (SPEC §10.5).
+struct AvSources { float intel[3]; float magicka[3]; };
+
+void LogSourceBreakdown(const AvSources& before, const AvSources& after) {
+    std::string line;
+    auto add = [&line](const char* name, const float b[3], const float a[3]) {
+        if (!line.empty()) { line += ", "; }
+        line += name;
+        line += " ";
+        for (int i = 0; i < 3; ++i) {
+            if (i) { line += " / "; }
+            line += mpf::FormatModifier(a[i] - b[i]);
+        }
+    };
+    add("Intelligence", before.intel, after.intel);
+    add("Magicka", before.magicka, after.magicka);
+    MPF_INFO("  change by source (magic / script / game): %s", line.c_str());
 }
 int            g_vtblGet  = 0;   // resolved GetActorFloatValue index
 
@@ -628,6 +656,20 @@ void ReportOffsets() {
 void HandleTransition(const mpf::Transition& t) {
     ++g_stats.maxChanges;
 
+    // A floor at zero applied by the engine would make the correction below overshoot
+    // by about this amount (Corrector.h, docs/SPEC.md section 10.5). Not observed so
+    // far; said loudly if it ever is.
+    const float raised = mpf::EngineRaisedDeficitOnDecrease(t.deltaMax, t.deficitBefore,
+                                                            t.deficitAfter, g_cfg.epsilon);
+    if (raised > 0.0f) {
+        MPF_ERR("  ENGINE MOVED THE DEFICIT on a decrease: %+.2f, more than regeneration "
+                "explains. Either a restore effect landed in the same instant, or the game "
+                "floors current Magicka at zero here (docs/SPEC.md section 10.5). In the "
+                "second case the correction below overshoots by about that amount. Please "
+                "report this log.", static_cast<double>(raised));
+        mpf::Log().Escalate(200, "the engine moved the deficit on a decrease");
+    }
+
     // Calibration first, and from this same transition. A transition that settles the
     // policy is by definition unambiguous, so it is also correctable, and there is no
     // reason to make the player wait for a second one.
@@ -930,6 +972,10 @@ void ObserveLoop() {
     constexpr unsigned long long kCharacterPollMs   = 250;
     mpf::BaseStats     lastStats;
     bool               haveStats      = false;
+
+    // The modifier sources of the previous poll, for the per-source breakdown.
+    AvSources lastSources{};
+    bool      haveSources = false;
     bool               statsRefused   = false;   // reason already logged for this load
     unsigned long long statsDueAt     = 0;       // 0 = nothing scheduled
     int                statsAttempts  = 0;       // failed first reads for this load
@@ -968,6 +1014,7 @@ void ObserveLoop() {
                 statsRefused = false;
                 statsAttempts = 0;
                 statsDueAt = 0;
+                haveSources = false;
                 haveBaseline = false;
                 reportedFound = false;
                 dumpedPopulated = false;
@@ -1094,14 +1141,21 @@ void ObserveLoop() {
             statsRefused = false;
             statsAttempts = 0;
             statsDueAt = now + kCharacterSettleMs;
+            haveSources = false;
         }
         if (dumpedPopulated) {
-            float intTotal = 0.0f;
-            float magTotal = 0.0f;
-            if (TotalAvModifier(g_player, mpf::kAV_Intelligence, intTotal) &&
-                TotalAvModifier(g_player, mpf::kAV_Magicka, magTotal)) {
+            AvSources src;
+            if (ReadAvSources(g_player, mpf::kAV_Intelligence, src.intel) &&
+                ReadAvSources(g_player, mpf::kAV_Magicka, src.magicka)) {
+                const float intTotal = src.intel[0] + src.intel[1] + src.intel[2];
+                const float magTotal = src.magicka[0] + src.magicka[1] + src.magicka[2];
                 const mpf::Transition t = g_model.Feed(intTotal, magTotal, mod);
-                if (t.valid) { HandleTransition(t); }
+                if (t.valid) {
+                    if (haveSources) { LogSourceBreakdown(lastSources, src); }
+                    HandleTransition(t);
+                }
+                lastSources = src;
+                haveSources = true;
             }
 
             // ---- the character ----------------------------------------------

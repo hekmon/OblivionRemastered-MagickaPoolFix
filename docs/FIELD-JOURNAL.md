@@ -2472,3 +2472,36 @@ not be done.
 
 Built (176 OK, 0 warnings, imports unchanged); not run on Windows. No Windows runtime is
 available here, so none of the failure paths has been exercised.
+
+## 21 October 2026 — the log, ready for investigating drains
+
+Question from the maintainer: does the log carry enough to investigate drains (SPEC
+§10.5)? Partly. It shows when a negative modifier starts and ends, how big it is, what
+the engine did to the deficit, and what the plugin wrote. It does not show:
+
+- whether the pool would have gone below zero (the absolute maximum is not read);
+- which source moved;
+- which effect caused it.
+
+An engine floor at zero would have gone unnoticed, and under one the correction
+overshoots. Two log-only additions, agreed with the maintainer:
+
+- **Per-source breakdown** in every transition: the change of the Intelligence and
+  Magicka modifiers in the magic, script and game arrays.
+- **`ENGINE MOVED THE DEFICIT`**, an error line on any decrease where the engine raised
+  the deficit by more than 2 points plus the §5.4 tolerance. Regeneration cannot explain
+  that much: under 2 points per poll even at Willpower 200. The line also raises the
+  detail level for 200 lines. The test is a pure function in `Corrector.h`
+  (`EngineRaisedDeficitOnDecrease`), tested against every measured decrease, all silent
+  (6 August 17:03, 28 August events 13 and 15, full-pool spills), and a synthetic floor,
+  reported.
+
+Still not possible from the log: whether the pool would have gone negative, which needs
+an estimate of the maximum once the character data is validated, and which effect it
+was, which needs the active effects. Both are recorded in SPEC §10.5.
+
+The README's AI line is now the maintainer's choice among three variants: "AI-written,
+human-directed. Code and docs by Claude (Anthropic); scope, decisions and every in-game
+test by me."
+
+Built: 183 OK (7 new), 0 FAIL, 0 warnings, imports unchanged. Not run in game.
