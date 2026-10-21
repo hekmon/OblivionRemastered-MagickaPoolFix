@@ -43,7 +43,7 @@ several tens of seconds after a buff expires, with no indication of the cause.
 Symptom C is the most punishing in play, and it is the one that makes the character
 unusable at the precise moment they have just lost their reinforcements.
 
-## 2. The intended behavior — the glass-of-water model
+## 2. The behavior this mod implements — the glass-of-water model
 
 The pool is a glass. The maximum is the capacity of the glass, current magicka is
 the water it contains.
@@ -333,7 +333,7 @@ The glass-of-water model holds to within a single frame of drift. On expiries 4
 and 6 the absolute value is preserved to `+0.2079` and `−0.0000` — the first gap is
 regeneration occurring in the same tick, not a calculation error. Event 2 loses
 3.9062 points, and that is correct: 323.9062 does not fit into a glass of 320;
-capping at `min(d − Δ, 0)` is the intended behavior.
+capping at `min(d − Δ, 0)` is what the model of chapter 2 prescribes.
 
 On casts 1 and 3, the gap of `−270.0000` is the **spell cost**, not drift.
 Fourth and fifth independent confirmations of this cost.

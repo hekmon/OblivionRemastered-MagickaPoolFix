@@ -38,7 +38,7 @@ symptoms follow from that one defect:
   zero: at 100/600, the buff ending leaves -200/300, and nothing can be cast until
   regeneration climbs back to zero.
 
-The intended model is a glass of water:
+The intended model of this mod is a glass of water:
 
 - **enlarging the glass adds no water**: raising the maximum must not grant magicka;
 - **shrinking the glass spills only the overflow**: lowering the maximum must only remove
