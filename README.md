@@ -188,9 +188,14 @@ Since 0.9.1 the correction itself has not changed: only the calibration bookkeep
 summary and the character data to the log; it has not been run in game yet. Every number is
 in [`docs/SPEC.md`](docs/SPEC.md), sections 4.6 and 4.7.
 
+A second 0.9.1 session, on 28 August 2026 (1 h 37 min, 17 transitions, 10 writes, no
+failures), added a cast at 95 % magnitude with armor worn and what reads as a Drain
+Magicka. The fix cancels a drain's effect on current magicka; whether it should is an
+open design question ([`docs/SPEC.md`](docs/SPEC.md) sections 4.8 and 10.5).
+
 **Not yet tested in game:** removing a Fortify Intelligence/Magicka item at a partial pool,
-ten activation/expiry loops in a row, potions, Drain Intelligence/Magicka, altars and
-blessings, and levelling up. [`docs/SPEC.md`](docs/SPEC.md) chapters 8 and 10 list them.
+ten activation/expiry loops in a row, potions, altars and blessings, and levelling up.
+[`docs/SPEC.md`](docs/SPEC.md) chapters 8 and 10 list them.
 
 ## Repository layout
 

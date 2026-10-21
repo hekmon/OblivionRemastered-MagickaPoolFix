@@ -2269,3 +2269,53 @@ Seen at a glance:
 - event 15 has a `MAGICKA STOLEN` verdict.
 
 The other casts were not from a full pool, so their costs still have to be worked out.
+
+## 21 October 2026 — the 28 August session, analysed
+
+The 0.9.1 log of 28 August 2026 (21:02–22:39) stayed on the test machine and is analysed
+here, with no notes from the player about that session. Full table and findings:
+`docs/SPEC.md` §4.8. This entry supersedes the "Pending" paragraph of the previous one.
+
+**Correction of my own reading in the previous entry and in conversation**: I first listed
+"spell costs of 266, 278, 284, 261 and 285" from a quick extraction that cut the
+`DECISION` lines short. Only 266 and 278 are costs, measured on full-pool casts. 284.06 and
+285.28 are deficits after casts from a partial pool (both are cost 278 again), and 261.61
+is a deficit before a 2-point change.
+
+### Findings
+
+- **No defect in the correction.** 17 transitions, 10 writes, all read back, 0 errors.
+  The 7 unwritten ones are full-pool decreases.
+- **The cost went from 266 to 278 across an item swap at 21:29** (Intelligence modifier
+  12 → 2 → 12 in 0.7 s). A brute-force fit of the four costs measured so far (270, 268,
+  266, 278) under mod 1846's formula finds one pattern only:
+  - Restoration +5 on 6 August and before the swap, gone after it;
+  - Luck 59 → 61 or 62 → 63 or 64;
+  - base cost about 1460–1470.
+
+  It requires the skill passed to the cost formula to include Fortify Restoration. The
+  `+5.0` on indices 21–25 in the 6 August dump (SPEC §3.4) fits.
+- **SPEC §4.7.3 corrected**: its effective skill of 103.6 ignored that `+5`, so its base
+  cost of ~1399 is withdrawn. The +2 Luck between the two groups of 6 August stands.
+- **Armor in the field**: event 11 is the spell at 95 % magnitude (+285), with the cost
+  unchanged. SPEC §10.4 predicted both.
+- **A Drain Magicka 22, most likely**, for 49 s during combat; regeneration ran at about
+  half rate just before it. The mod cancelled its effect on current magicka, which raises
+  a design question now open in SPEC §10.5.
+- **A lasting Intelligence −1** from 22:08, probably a Damage Intelligence. Its `PARTIAL`
+  verdict comes from in-poll regeneration exceeding the tolerance of a 2-point change; the
+  decision was right regardless.
+- **The Intelligence baseline is 12, not 10**: something adds +2 besides the ring.
+
+### Small defects found in the log text (not fixed yet)
+
+- The `PARTIAL` verdict text says "On an INCREASE this is the ordinary shape when you cast
+  the fortification on yourself", and it is printed for decreases too (event 13).
+- On a small change, regeneration within one poll exceeds the tolerance `0.01 + 0.02 ×
+  |Δ|`, so the transition is classed `PARTIAL` and gives no calibration evidence. It has
+  no effect with the default `iEnginePolicy = 1`.
+
+### Still open after this session
+
+Every expiry and the item swap happened with the pool full, so SPEC chapter 8 scenarios 5
+(equip/unequip at a partial pool) and 6 (ten loops with a drift check) are still open.

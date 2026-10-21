@@ -438,6 +438,28 @@ than levelling. Not yet confirmed by the player: the current Luck has to be read
 | "effective skill is capped at 100, the cost is at its floor, so only a different base cost remains possible" | the cap is indeed documented for vanilla ([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making)) but mod 1846 removes it with a binary patch. The base costs 1350 and 1340 that followed from it are wrong |
 | "at effective skill ≥ 116.67 spells would become free, which is not observed, so the cap is active" | doubly invalid reasoning: the cap is not active, and the mod's `> 100` branch is hyperbolic, so no zero or negative cost is reachable whatever the skill. The mod deliberately works around this problem |
 
+**Correction, 21 October 2026: the effective skill above ignored a fortify.** The
+resolution assumes `S = 100 + 0.4 × (Luck − 50)`, that is, Restoration 100 with no
+modifier. But the field dump of §3.4 shows `+5.0` on indices 21 to 25, Restoration
+included, and the session of 28 August (§4.8) cannot be fitted without that `+5`. The
+ratio argument still gives +2 Luck between the two groups of casts, so the Luck deduction
+stands. The base cost does not: it is **about 1460–1470**, not 1399. Fitting all four
+costs measured so far (270, 268, 266, 278) with the installed formula, and allowing the
+Restoration modifier to be 0 or +5, gives a single pattern:
+
+- Restoration +5 during every cast of 6 August and the first casts of 28 August, gone
+  after 21:29 on 28 August;
+- Luck 59 → 61 (or 62) → 63 (or 64);
+- base cost 1460.7 to 1471.5, depending on the Luck path and on whether the game rounds,
+  floors or ceils the cost.
+
+With the modifier at 0 throughout, as the resolution above assumed, no base cost fits
+all four. `[DEDUCTION]` resting on three assumptions: the same spell every time
+(`Δmax = +300` each time, except one cast at 95 % magnitude, §4.8); base Restoration 100;
+and the skill passed to the cost formula including Fortify Restoration. The character
+block of the 1.0.0-dev log (§10.8) shows both the Luck and the Restoration modifier, so
+the first session with it can check this.
+
 This does not affect the correction, which never reads the spell cost.
 
 #### 4.7.4 Stability
@@ -450,6 +472,69 @@ Three re-primings on float bursts, two of them at 21:01. `lost = 0`, `rescans = 
 
 This is not proof of the absence of memory bugs; it is a large sample without
 incident.
+
+### 4.8 Session of 28 August 2026 (0.9.1, analysed 21 October 2026)
+
+1 h 37 min, 21:02 to 22:39. The log stayed on the test machine until 21 October and was
+analysed then; the player's own notes from that session were not kept, so every cause in
+the table below is read from the numbers alone. 17 transitions, 10 writes, **0 write
+failures, 0 error lines, no crash**. The 7 transitions without a write are all
+`OVERFLOW SPILLED`: maximum fell while the pool was full, and doing nothing is right.
+
+The Intelligence modifier total sits at **12** between buffs, not 10 as on 6 August:
+something besides the +10 ring adds 2, and from 22:08 on it is 11.
+
+| # | time | Int modifier | Magicka modifier | Δmax | deficit before | engine left (Δd) | written | verdict | cause `[DEDUCTION]` |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 21:13:16 | 12 → 112 | 0 → 100 | +300 | 0 | −266 (−266) | −566 | PARTIAL | the +300 spell, cost 266 |
+| 2 | 21:14:15 | 112 → 12 | 100 → 0 | −300 | 0 | 0 | — | SPILLED | its expiry, pool full |
+| 3 | 21:15:16 | 12 → 112 | 0 → 100 | +300 | 0 | −266 (−266) | −566 | PARTIAL | cost 266 |
+| 4 | 21:16:14 | 112 → 12 | 100 → 0 | −300 | 0 | 0 | — | SPILLED | expiry, pool full |
+| 5 | 21:29:09 | 12 → 2 | 0 | −20 | 0 | 0 | — | SPILLED | an Int +10 item removed, pool full |
+| 6 | 21:29:10 | 2 → 12 | 0 | +20 | 0 | 0 (0) | −20 | FREE MAGICKA | an Int +10 item equipped 0.7 s later |
+| 7 | 21:33:54 | 12 → 112 | 0 → 100 | +300 | 0 | −278 (−278) | −578 | PARTIAL | cost 278 |
+| 8 | 21:34:59 | 112 → 12 | 100 → 0 | −300 | 0 | 0 | — | SPILLED | expiry, pool full |
+| 9 | 21:35:00 | 12 → 112 | 0 → 100 | +300 | 0 | −278 (−278) | −578 | PARTIAL | recast 1.7 s after expiry, cost 278 |
+| 10 | 21:36:17 | 112 → 12 | 100 → 0 | −300 | 0 | 0 | — | SPILLED | expiry, pool full |
+| 11 | 21:37:40 | 12 → 107 | 0 → 95 | +285 | −6.06 | −284.06 (−278) | −569.06 | PARTIAL | **95 % magnitude**: armor worn (§10.4), cost unchanged at 278 |
+| 12 | 21:38:43 | 107 → 12 | 95 → 0 | −285 | 0 | 0 | — | SPILLED | expiry, pool full |
+| 13 | 22:08:54 | 12 → 11 | 0 | −2 | −261.75 | −261.61 (+0.14) | −259.61 | PARTIAL | Intelligence −1, lasting to the end of the log |
+| 14 | 22:33:50 | 11 → 111 | 0 → 100 | +300 | −7.28 | −285.28 (−278) | −585.28 | PARTIAL | cost 278, pool not full |
+| 15 | 22:34:24 | 111 | 100 → 78 | −22 | −356.92 | −356.90 (+0.02) | −334.90 | **MAGICKA STOLEN** | a negative Magicka effect of 22 starts |
+| 16 | 22:34:45 | 111 → 11 | 78 → −22 | −300 | 0 | 0 | — | SPILLED | the +300 spell expires, the −22 remains |
+| 17 | 22:35:13 | 11 | −22 → 0 | +22 | −129.32 | −129.06 (+0.26) | −151.06 | FREE MAGICKA | the −22 effect ends, 49 s after it began |
+
+What this session adds:
+
+- **The cost moved from 266 to 278** across the item swap of events 5 and 6. Fitted in
+  §4.7.3: the item removed carried the Restoration +5 that the cost formula needs, and the
+  one put back on did not. `[DEDUCTION]`
+- **Armor, measured.** Event 11 is the same spell at 95 % magnitude (`+285 = 2 × 95 +
+  95`), exactly the effectiveness cap with any armor (§10.4). Its cost is unchanged at
+  278, consistent with effectiveness scaling the magnitude and not the cost.
+- **A drain, measured.** Events 15 and 17 are a negative Magicka modifier of 22 that
+  lasted 49 s while the Fortify Magicka 100 was active. `[DEDUCTION]`: a Drain Magicka 22
+  cast on the player. The regeneration between events 14 and 15, 228 points in 34 s or
+  6.7 /s, is about half the 12.98 /s of §3.3, which fits being in combat (§3.3: halved).
+  The engine moved the maximum and left the deficit alone, as for every other change: the
+  vanilla game took 22 points of current magicka at the start and gave them back at the
+  end. The mod cancelled both, so **with the fix this drain cost the player nothing**.
+  Whether that is right is a design question, open in §10.5.
+- **An Intelligence −1 that does not end** (event 13). `[DEDUCTION]`: a Damage
+  Intelligence, which lasts until restored
+  ([UESP, Drain](https://en.uesp.net/wiki/Oblivion:Drain) contrasts it with Drain). The
+  `PARTIAL` verdict comes from regeneration within the same 16 ms poll (+0.14) exceeding
+  the tolerance of a 2-point change (§5.4); the decision does not depend on the verdict
+  and current magicka was preserved.
+- **Calibration**: events 15 and 17 are cost-free changes and were counted as evidence for
+  "the engine ignores", reaching 3 for and 0 against, consistent with the pinned default.
+- Unexplained: between events 15 and 16 the pool went from −334.90 to full in 21.7 s,
+  faster than regeneration at the measured rate. A restore effect is the obvious candidate;
+  nothing in the log shows it.
+
+Not covered by this session, despite the 17 transitions: every expiry happened with the
+pool full, and the item swap also happened with the pool full. Scenarios 5 and 6 of
+chapter 8 remain open.
 
 ## 5. The correction rule
 
@@ -1047,13 +1132,27 @@ non-integer values for other combinations.
 This requires no adaptation: the correction reads `Δ` from the actual modifiers and has
 never assumed a round magnitude. It is noted here because the corollary is that observing
 `+300.0000` on all eight casts **proves** that the test character was wearing no armor,
-which served to eliminate armor as the cause in §4.7.3.
+which served to eliminate armor as the cause in §4.7.3. The first cast at 95 % was
+logged on 28 August 2026 (§4.8, event 11): `+285`, corrected like any other.
 
 ### 10.5 Untested effects
 
-All measurements concern fortifications cast by the player and an enchanted ring. Not
-observed: potions, diseases and curses that drain Intelligence, altars and blessings,
-Drain Magicka effects, and the level-up that permanently increases Intelligence.
+Measured so far: fortifications cast by the player, an enchanted ring, and, on 28
+August 2026 (§4.8), what reads as a Drain Magicka 22 and a lasting Intelligence −1. Not
+observed: potions, altars and blessings, and the level-up that permanently increases
+Intelligence.
+
+**Open design question: drains.** On the drain of §4.8 the engine did what it does for
+every change, and the mod did what it does for every change: it preserved current
+magicka on the way down and refused the gain on the way back. A Drain Magicka on a pool
+that is not full therefore costs the player nothing with the fix, where vanilla takes the
+magnitude away for the duration. The glass-of-water model of chapter 2 says that is
+correct: the glass shrank, the water stayed below the rim. A reading in which a drain is
+meant to take the water is also possible, and UESP does not settle it: drain effects
+"reduce the points of a target's statistic" and "are then automatically reversed"
+([UESP, Drain](https://en.uesp.net/wiki/Oblivion:Drain)), without saying whether current
+or maximum is meant. Telling a hostile drain apart from the expiry of the player's own
+fortify would need the list of active effects, which the mod does not read.
 
 `[DEDUCTION]`: all of them go through the same modifier arrays, so the rule should apply
 as is. A level-up, on the other hand, raises the base attribute and not a modifier, and
