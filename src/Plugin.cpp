@@ -65,6 +65,7 @@ mpf::FloatWatch  g_watch;
 std::uintptr_t g_vtable   = 0;
 std::uintptr_t g_npcVtable = 0;  // TESNPC, to verify the player's base form
 std::uintptr_t g_player   = 0;   // PlayerCharacter instance
+std::uintptr_t g_playerSlot = 0; // static slot in the game module that held it, once found
 int            g_offMod   = 0;   // resolved magickaModifier offset
 int            g_offMagicAV  = 0;  // resolved magicActorValueModifiers offset
 int            g_offScriptAV = 0;  // resolved scriptActorValueModifiers offset
@@ -203,7 +204,7 @@ std::string CostText() {
                                static_cast<double>(g_cost.freq);
         char buf[160];
         std::snprintf(buf, sizeof(buf),
-                      " | own time %.2f ms per second, memory map refresh %.2f ms avg "
+                      " | own time %.2f ms per second, memory map refreshes %.2f ms avg "
                       "%.2f ms max (x%u)",
                       static_cast<double>(g_cost.busy) * ms / windowS,
                       g_cost.refreshes ? static_cast<double>(g_cost.refresh) * ms /
@@ -543,7 +544,16 @@ static void FindPlayerViaHeap(ScanResult& out, std::size_t budgetBytes) {
 
 bool FindPlayerInstance(std::size_t budgetBytes, ScanResult& out) {
     out = ScanResult{};
+    // The snapshot is only used by the search, so it is refreshed here and nowhere
+    // else during play. A walk of the whole address space took 106 to 178 ms on the
+    // test bench (21 October 2026); done every 2 s, it was nearly all of the
+    // plugin's own time.
+    const long long t0 = QpcNow();
     g_mem.Refresh();
+    const long long dt = QpcNow() - t0;
+    g_cost.refresh += dt;
+    if (dt > g_cost.refreshMax) { g_cost.refreshMax = dt; }
+    ++g_cost.refreshes;
     FindPlayerViaStatics(out);
     if (!out.instance && g_cfg.heapScan) {
         FindPlayerViaHeap(out, budgetBytes);
@@ -1058,7 +1068,7 @@ void ObserveLoop() {
 
     unsigned long long lastBeat  = GetTickCount64();
     unsigned long long lastScan  = 0;
-    unsigned long long lastRefresh = 0;
+    unsigned long long lastSlotCheck = 0;
     bool  haveBaseline = false;
     float lastMax = 0.0f;
     bool  reportedFound = false;
@@ -1104,17 +1114,6 @@ void ObserveLoop() {
         const BusyScope busy;
         const unsigned long long now = GetTickCount64();
 
-        // Refresh the page snapshot periodically: the heap grows and shrinks, and
-        // a stale snapshot would make valid reads look unreadable.
-        if (now - lastRefresh > 2000) {
-            const long long t0 = QpcNow();
-            g_mem.Refresh();
-            const long long dt = QpcNow() - t0;
-            g_cost.refresh += dt;
-            if (dt > g_cost.refreshMax) { g_cost.refreshMax = dt; }
-            ++g_cost.refreshes;
-            lastRefresh = now;
-        }
 
         if (!InstanceStillValid()) {
             if (g_player) {
@@ -1135,9 +1134,23 @@ void ObserveLoop() {
                 populatedAt = 0;
                 g_model.Discontinuity("the player object moved");
             }
-            // Rescanning is expensive, so throttle it. Before a save is loaded
-            // there is no player at all, which is normal, not an error.
-            if (now - lastScan > 3000) {
+            // Once the static slot is known, reading it is two checked reads, so it
+            // is tried often; a full scan is the fallback, and it is expensive (a
+            // memory map refresh, then the game module's writable sections), so it
+            // is throttled, much harder once the slot is known. Before a save is
+            // loaded there is no player at all, which is normal, not an error.
+            if (g_playerSlot && now - lastSlotCheck > 250) {
+                lastSlotCheck = now;
+                std::uintptr_t cand = 0, vt = 0;
+                if (mpf::SafeRead(g_playerSlot, cand) && cand &&
+                    mpf::SafeRead(cand, vt) && vt == g_vtable) {
+                    g_player = cand;
+                    MPF_INFO("player object found at 0x%llX via the static slot found "
+                             "earlier", static_cast<unsigned long long>(g_player));
+                    continue;
+                }
+            }
+            if (now - lastScan > (g_playerSlot ? 30000ull : 3000ull)) {
                 lastScan = now;
                 ++g_stats.rescans;
                 ScanResult sr;
@@ -1147,6 +1160,7 @@ void ObserveLoop() {
                              static_cast<unsigned long long>(g_player), sr.how,
                              sr.slot ? "" : " (no static slot)");
                     if (sr.slot) {
+                        g_playerSlot = sr.slot;
                         MPF_DBG("  static slot   : 0x%llX (RVA 0x%X) - a fixed "
                                 "address for this game build, no scan needed to "
                                 "reach the player again",

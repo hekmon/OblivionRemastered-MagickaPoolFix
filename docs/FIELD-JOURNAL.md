@@ -2559,3 +2559,32 @@ Log-only changes in this build (still 1.0.0-dev):
 
 Built: 190 OK (7 new), 0 FAIL, 0 warnings, imports unchanged, `.conf` byte-identical. Not
 run in game.
+
+## 21 October 2026 — session 3: the script array, the ring's Luck, the plugin's own cost
+
+Third short session (SPEC §4.9), with the build that prints the source split and the
+estimated pool. Seven transitions, four writes, no failure.
+
+- **Script array, first time.** Dropping and picking up the Scales of Pitiless Justice
+  moved only the script array (`s-2`, then `s+2` on Intelligence). The engine left the
+  deficit alone; the fix applied the same rule. The drop happened with the pool not
+  full: first clean decrease at a partial pool, current magicka kept at 302.
+- **The four −1** (Int, Agi, Wil, Spd) are in the game array. `[DEDUCTION]`: damage.
+- **The ring's Luck counts in the spell cost**: 288 with the ring off, 278 with it on.
+  Re-fitted all six costs measured since August: base cost about 1517, not 1460–1470.
+  SPEC §4.7.3 corrected, and my own paragraph from earlier this evening withdrawn: I had
+  called this outcome unlikely, with reasoning that mixed up which Luck the profile showed.
+- **The plugin's own time: 62 to 72 ms per second**, almost all of it the memory map
+  refresh (106 to 178 ms, every 2 s). Wasted: the snapshot only serves the player search,
+  which refreshes it itself. Removed; the static slot found at startup is now re-read
+  instead of searching again, and a full search happens at most every 30 s once that slot
+  is known. Next log should show the own time near zero.
+- **Crash at quit**, in `UE4SS.dll` (access violation reading), while the Lua mod
+  MagicSkillLevelingFixed was polling for the departed player. Our thread was parked in
+  `ntdll` at that moment. `[DEDUCTION]`: not this plugin. Recorded in SPEC §4.9.
+
+Not done again: the spell expiring with the pool not full (it expired at a full pool,
+before the tests), and a level-up.
+
+Built: 190 OK, 0 FAIL, 0 warnings, imports unchanged, `.conf` byte-identical. Not run in
+game.

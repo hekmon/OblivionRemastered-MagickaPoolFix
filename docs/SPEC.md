@@ -509,19 +509,28 @@ and the skill passed to the cost formula including Fortify Restoration. The char
 block of the 1.0.0-dev log (§10.8) shows both the Luck and the Restoration modifier, so
 the first session with it can check this.
 
-**Checked 21 October 2026, partly.** The character block (§10.8) shows base Luck **63**
-and a Restoration modifier of **+0**, and the same spell cost **278** (§4.9). Both agree
-with the fit: with `S = 100 + 0.4 × (63 − 50) = 105.2`, a cost of 278 gives a base cost of
-about **1462** (1459.7 to 1464.9 if the game rounds), inside 1460.7 to 1471.5.
+**Settled 21 October 2026: the ring's Luck counts, and the base cost is about 1517.**
+The same spell cost **278** with the ring of §3.3 worn and **288** with it removed (§4.9),
+Restoration +0 both times, base Luck 63 (§10.8). The ring gives +10 Luck and nothing that
+enters the cost formula besides it, so the formula takes Luck **with** its Fortify:
+`S = 100 + 0.4 × (73 − 50) = 109.2` with the ring, `105.2` without, and the two costs
+agree with one base cost.
 
-One question is open. The ring of §3.3 adds **+10 Luck**, and it was worn for that cast.
-With the Luck the character sheet shows, 73, `S = 109.2` and the base cost would be about
-1518, outside the fit. Either the cost formula takes Luck **without** its Fortify, or the
-fit's anchor (Luck 59 on 6 August) was itself read with the ring on, which would shift
-every Luck in the fit by 10. The second would need base Luck 53 on 28 August and 63 by
-21 October, ten points in four levels at most one per level (UESP, Remastered Leveling),
-so it is unlikely. `[DEDUCTION]`, to be settled by one cast with the ring off: same cost
-means Luck's Fortify does not count.
+The fit above used the Luck of the character profile and left the ring out, so every `S`
+in it was 4 points too low, and its base cost with them. Fitted again over all six costs
+(270, 268, 266, 278 in August, 278 and 288 on 21 October), with the ring's +10 Luck in
+every cast but the last and a brute-force search over the Luck path, the Restoration +5
+and the game's rounding:
+
+- base Luck **59 → 61 → 63** (or 58 → 60 or 61 → 62 or 63) across 6 August and early
+  28 August, and 63 since;
+- Restoration +5 on 6 August and early 28 August, as before;
+- base cost **1512.4 to 1520.1**, about 1517, depending on whether the game rounds
+  (1515.2 to 1517.5), floors or ceils.
+
+Withdrawn: "base cost about 1460–1470" (the correction above) and, from an earlier draft
+of this paragraph, "the cost formula may take Luck without its Fortify". The +2 Luck
+steps and the Restoration +5 stand.
 
 The Restoration +5 of 6 August and early 28 August has a likely source: the character
 owns a "Boucle pentamagique" (French game text, "pentamagic"), and the dump of §3.4 had
@@ -618,11 +627,10 @@ Read again on 21 October 2026, with the character's equipment seen in game (§4.
 
 ### 4.9 Sessions of 21 October 2026 (1.0.0-dev)
 
-Two short sessions on the test bench, now with OblivionRemasteredPerformanceFix (§10.7).
-First line both times: `ACTIVE`, PE `0xF19077A4 (validated build)`, `conf found`, no
-setting away from its default. Player found 41 s and 11 s after start. Both logs end on
-"player instance ... no longer valid" when the player quit; the game closed before the
-next heartbeat, so nothing followed. That message named only a save load or a moved
+Three short sessions on the test bench, now with OblivionRemasteredPerformanceFix (§10.7).
+First line every time: `ACTIVE`, PE `0xF19077A4 (validated build)`, `conf found`, no
+setting away from its default. Player found 41 s, 11 s and 11 s after start. Every log
+ends on "player instance ... no longer valid" when the player quit. That message named only a save load or a moved
 object; it now also names a quit and the game closing.
 
 Session 1, 7 minutes, three transitions, all with the pool full:
@@ -643,6 +651,57 @@ transition. Its character block, taken with that save, was compared field by fie
 
 The spell is Fortify Intelligence, Willpower and Magicka 100: the Willpower modifier goes
 from +59 to +159 with it, and Active Effects lists all three.
+
+Session 3, 3 minutes, with the build that prints the source split and the estimated pool.
+The character block now reads `Int 100/+111 (m+110 s+2 g-1)`: the Scales sit in the
+script array, exactly as UESP describes them, and the four unexplained −1 are in the game
+array (§10.8). The estimate at load, 622 / 622, matches the sheet. Seven transitions:
+
+| # | time | Int modifier (source) | Magicka mod. | Δmax | deficit before | engine left (Δd) | written | estimated current / max after | verdict | cause |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 21:25:07 | 111 → 11 (m) | 100 → 0 | −300 | 0 | 0 | — | 322 / 322 | SPILLED | the spell expires, pool full |
+| 2 | 21:25:24 | 11 → 1 (m) | 0 | −20 | 0 | 0 | — | 302 / 302 | SPILLED | ring off, pool full |
+| 3 | 21:25:28 | 1 → 11 (m) | 0 | +20 | 0 | 0 (0) | −20 | 302 / 322 | FREE MAGICKA | ring on |
+| 4 | 21:25:35 | 11 → 9 (**s**) | 0 | −4 | −20 | −20 (0) | −16 | 302 / 318 | **MAGICKA STOLEN** | the Scales dropped, pool **not** full |
+| 5 | 21:25:38 | 9 → 11 (**s**) | 0 | +4 | 0 | 0 (0) | −4 | 318 / 322 | FREE MAGICKA | the Scales picked up |
+| 6 | 21:25:54 | 11 → 1 (m) | 0 | −20 | 0 | 0 | — | 302 / 302 | SPILLED | ring off, pool full |
+| 7 | 21:25:59 | 1 → 101 (m) | 0 → 100 | +300 | −288 | −288 (0) | −588 | 14 / 602 | FREE MAGICKA | the spell, ring off: **cost 288** |
+
+What it adds:
+
+- **The first script-driven changes.** Events 4 and 5 move only the script array. The
+  engine left the deficit alone on both, as for spells and enchantments, and the rule
+  applied unchanged. Event 4 is also the first decrease measured on a pool that was not
+  full with a clean cause: the vanilla game would have taken 4 points, the fix kept
+  current magicka at 302.
+- **The spell cost depends on the ring's Luck**: 288 with the ring off against 278 with
+  it on. §4.7.3 is settled by it.
+- In event 7 the cost was charged one poll **before** the effect landed, so the
+  transition itself shows no movement of the deficit and reads as FREE MAGICKA. In
+  session 1 (event 3) cost and effect landed in the same poll. Either way the rule keeps
+  the cost paid and the 300 unpaid.
+- The estimated pool is consistent through every step (622 → 322 → 302 → 322 → ...).
+  It was compared with the screen only at load, with the pool full.
+
+Still not covered: an expiry with the pool not full, and a level-up.
+
+**The plugin's own time.** This build reports it: **62 to 72 ms per second** on the
+plugin's thread, nearly all of it a walk of the whole address space (the memory map
+refresh) every 2 s, at **106 to 178 ms each**. That snapshot is only used to search for
+the player, and every search refreshes it first, so the periodic refresh was wasted.
+Removed in the next build, which also re-reads the static slot that held the player
+instead of searching again, and searches at most every 30 s once that slot is known. How
+much of the lag the maintainer felt came from it is not known; they also changed their
+DLSS settings in this session and report it less laggy.
+
+**A crash while quitting.** UE4SS wrote `crash_2026_10_21_19_26_18.dmp` (UTC) 3 s after
+the player object went away: an access violation reading `0x292708D6240` at
+`UE4SS.dll+0x71FBEE`. Our thread was in `ntdll` at that moment, our module only further
+up its stack, and it still wrote a heartbeat about a second after the dump's timestamp.
+Meanwhile UE4SS's log shows the Lua mod MagicSkillLevelingFixed retrying "Player was invalid!" every 200 ms.
+`[DEDUCTION]`: a fault in UE4SS or one of its Lua mods during shutdown, not in this
+plugin. No symbols for UE4SS, so the faulting function is not identified. The four dumps
+of 6 August are a different crash, a write to address 0 inside the game executable.
 
 ## 5. The correction rule
 
@@ -1141,7 +1200,10 @@ The reference installation hosts at least an attribute scaling modifier, a skill
 modifier, a spell removal plugin, a tag cleaner, as well as
 [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) via `dwmapi.dll` and, since 21 October 2026,
 [OblivionRemasteredPerformanceFix](https://github.com/LTSharpe/OblivionRemasteredPerformanceFix)
-as `version.dll`, with the ASI loader renamed to `winmm.dll`. The latter produces the
+as `version.dll`, with the ASI loader renamed to `winmm.dll`. UE4SS's own mod folder
+holds, among others, UltraPlusExtensions, EnhancedLightRadius, ShadowsReworked,
+SimplySwimUp, FemaleLocomotion and MagicSkillLevelingFixed, a Lua mod that polls the
+player (§4.9). The latter produces the
 memory dump files during a crash; it is not their cause.
 
 A mod that modifies attributes therefore also modifies the maximum magicka. The rule of
@@ -1472,7 +1534,11 @@ script and game arrays when it is not all magic, written `+22 (m+20 s+2)`. The S
 Pitiless Justice (§4.8) explain Strength +2 and Personality −2 entirely, and Intelligence
 and Agility +2 each. That leaves **−1 on Intelligence, Agility, Willpower and Speed** with
 no source on any screen; the 28 August Intelligence −1 (§4.8, event 13) is probably one of
-them. The first log with the split says which array holds them.
+them. The first log with the split (§4.9, session 3) confirms the Scales in the **script**
+array, `s+2` and `s-2` exactly where UESP puts them, and places the four −1 in the
+**game** array. `[DEDUCTION]`: damage (a Damage Attribute effect, which lasts until
+restored, §4.8), on four attributes at once. A Restore Attribute effect would clear it,
+and would also be the first game-array change the fix sees.
 
 Not done, and out of scope until validated: correcting a change of **base**
 Intelligence the way modifier changes are corrected, which would close the blind spot
