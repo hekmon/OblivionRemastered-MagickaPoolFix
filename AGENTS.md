@@ -76,6 +76,10 @@ that changes what ships, what is public, or the game install.
 
 ### Code
 
+- **Never copy code from commonlibob64 or from Baestus's repositories.** commonlibob64 is
+  GPL-3.0, and copying it would force this MIT project under the GPL; Baestus's
+  repositories carry no license at all. Offsets, indices and facts are fine, quoted with
+  their source, as `src/PCH.h` does. Credit any new source in the README's "Credits".
 - Translate an enum with a `switch` that lists every case and has **no `default`**, so a
   new value becomes a compile error.
 - The math (`MagickaMath.h`), the decision (`Corrector.h`) and the calibrator

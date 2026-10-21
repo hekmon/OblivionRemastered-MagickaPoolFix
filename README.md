@@ -38,6 +38,8 @@ above 100 in the formulas that matter:
   (Nexus [2068](https://www.nexusmods.com/oblivionremastered/mods/2068)). Attributes above
   100 count in the damage formula instead of being clamped to 100.
 
+Their source code was also this plugin's starting point; see [Credits](#credits).
+
 Neither mod lets a *base* skill or attribute level past 100. Neither touches maximum
 magicka or regeneration either: 1846's source hooks only the cost formula, and 2068's
 README describes the damage formula only. Those two did not need uncapping. Intelligence
@@ -359,6 +361,32 @@ maximum produces a `DECISION` line, and every write is followed by `WRITE OK` or
 - **Cross-thread reads can tear.** The plugin's thread is not the game thread. Non-finite
   and implausible values are discarded, the object's vtable pointer is re-verified before
   each sample, and every write is read back.
+
+## Credits
+
+- **[commonlibob64](https://github.com/libxse/commonlibob64)** (libxse), the
+  reverse-engineered layout of the game's classes. Every memory offset this plugin uses
+  and the actor-value indices come from its headers, and each offset was confirmed in game
+  before the plugin relied on it ([`docs/SPEC.md`](docs/SPEC.md) section 3.4). The plugin
+  does not build against it, and contains none of its code: only offsets and indices,
+  quoted with their source. commonlibob64 is GPL-3.0.
+- **Baestus**, author of the two uncappers this plugin was born alongside:
+  [Skill Damage Scaling Cap Remover](https://github.com/Baestus/OBSE64_Skill_Damage_Scaling_Cap_Remover)
+  (Nexus [1846](https://www.nexusmods.com/oblivionremastered/mods/1846)) and
+  [Attribute Scaling Cap Remover](https://github.com/Baestus/OBSE64_Attribute_Scaling_Cap_Remover)
+  (Nexus [2068](https://www.nexusmods.com/oblivionremastered/mods/2068)). Their source was the
+  starting point: the plugin's skeleton (`DllMain` only starts an init thread, and all work
+  happens off the loader lock) follows their ASI plugins, and their reading of
+  `luck_skill_modifier` and of the spell cost formula is what explained the measured spell
+  costs ([`docs/SPEC.md`](docs/SPEC.md) section 4.7.3). No code is copied: their
+  repositories carry no license ([`docs/FIELD-JOURNAL.md`](docs/FIELD-JOURNAL.md),
+  section 12.4).
+- **[Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)** (ThirteenAG),
+  which loads the plugin.
+- **[UE4SS](https://github.com/UE4SS-RE/RE-UE4SS)**, whose crash dumps were how the early
+  crashes were traced.
+- **[UESP](https://en.uesp.net/wiki/Oblivion:Oblivion)**, the main source for the game
+  mechanics described in these docs.
 
 ## License
 
