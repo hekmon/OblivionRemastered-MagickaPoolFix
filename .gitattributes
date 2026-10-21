@@ -1,0 +1,13 @@
+* text=auto eol=lf
+
+# The shipped .conf must be CRLF (Notepad-friendly); keep any copy of it that way.
+*.conf text eol=crlf
+
+*.sh  text eol=lf
+*.py  text eol=lf
+
+*.asi binary
+*.dll binary
+*.dmp binary
+*.png binary
+*.zip binary

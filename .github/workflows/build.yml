@@ -1,0 +1,50 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64 zip
+
+      - name: Build, test, generate .conf
+        run: bash ./build.sh
+
+      - name: Package
+        run: bash ./tools/package.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MagickaPoolFix
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: MagickaPoolFix
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" *.zip --repo "$GITHUB_REPOSITORY" --draft --title "MagickaPoolFix $GITHUB_REF_NAME"

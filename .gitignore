@@ -1,0 +1,34 @@
+# Build outputs
+build/
+build-*/
+dist/
+out/
+
+# Binaries and generated files: shipped as GitHub Release assets, not tracked.
+# The .conf is generated from src/Config.h by tools/gen_conf.py.
+*.asi
+*.dll
+*.exe
+*.obj
+*.o
+*.pdb
+*.zip
+SHA256SUMS
+MagickaPoolFix.conf
+
+# Runtime artifacts from the game folder
+*.log
+*.dmp
+*.vcall
+
+# Editors and OS
+.vs/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Work files
+.translate/
+__pycache__/
