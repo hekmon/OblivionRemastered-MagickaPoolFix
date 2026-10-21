@@ -2407,3 +2407,43 @@ only Strength, Speed and Willpower (UESP). `[DEDUCTION]`: an item or effect givi
 every attribute, and no vampirism bonus active at that moment, since any stage would have
 given at least 14.03 /s. §3.3 corrected; the regeneration measurement and its formula are
 unaffected.
+
+## 21 October 2026 — `.conf` text review
+
+Every statement of the generated `.conf` was checked against the code, SPEC and this
+journal.
+
+### Corrected
+
+- **The virtual-call warning (`bCallVirtuals`)** told its story twice, in two orders, and
+  the second telling was wrong. The second said the guarded call faulted and "a later run
+  on the same build merely hung"; in fact the hang came first. The order was: 0.3.1
+  (16:04), the call never returned and the game carried on; then 0.4.0 (16:15), the
+  guarded call faulted and UE4SS showed a "Fatal Error". The block also contained a
+  stray "The intended sequence is:". Rewritten once, in order.
+- **`[Offsets]`** said to touch them only if "the invariant self-test failed".
+  **`iForceHypothesis`** said the plugin calibrates "in a fraction of a second". Both
+  only happen with `bCallVirtuals = 1`, which this build forbids. Both now say so.
+- **The header** listed two symptoms where SPEC has three. It also called vanilla
+  "inconsistent" with "the same observable result" for Fortify Magicka and Fortify
+  Intelligence: that is an original-game statement from UESP, and Remastered was only
+  measured on a spell carrying both. It now says what UESP documents and what was
+  measured.
+- **Regeneration** points to the "Oblivion Remastered" section of UESP's Willpower page,
+  and says two other UESP pages disagree (SPEC §3.3). "11.2/sec" became 11.25.
+- **"Cast Fortify Willpower FIRST"** became "fortify Willpower". It now mentions the
+  Remastered rule that one spell can carry several Fortify Attribute effects.
+- **`bModuleInventory` and `bEnabled`** describe what 1.0.0-dev logs at which level.
+- **"READ THIS BEFORE COMPLAINING"** became "READ THIS FIRST".
+
+### Credited
+
+`src/Config.h` already said its conventions (Hungarian prefixes, regeneration of the
+defaults) come from Delete Spells - OBSE - ASI (Nexus 4934). The README's Credits now say
+so too.
+
+### Noted, not changed
+
+`LoadConfig` writes the defaults whenever it cannot open the file, so an existing but
+unreadable `.conf` (locked, for instance) would be overwritten. The text says "missing or
+unreadable", which matches the code; whether to keep that behaviour is open.

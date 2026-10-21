@@ -458,6 +458,9 @@ contributor reads. Commits written by Claude carry a `Co-Authored-By: Claude` tr
   costs ([`docs/SPEC.md`](docs/SPEC.md) section 4.7.3). No code is copied: their
   repositories carry no license ([`docs/FIELD-JOURNAL.md`](docs/FIELD-JOURNAL.md),
   section 12.4).
+- **[Delete Spells - OBSE - ASI](https://www.nexusmods.com/oblivionremastered/mods/4934)**,
+  whose `.conf` was the model for this one: Hungarian `b`/`i`/`f`/`s` prefixes, and the
+  defaults written back when the file is missing.
 - **[Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)** (ThirteenAG),
   which loads the plugin.
 - **[UE4SS](https://github.com/UE4SS-RE/RE-UE4SS)**, whose crash dumps were how the early

@@ -149,22 +149,24 @@ R"CONF(; =======================================================================
 ;
 ;      current = maximum + magickaModifier        (magickaModifier <= 0)
 ;
-;  Nothing recalculates that offset when the maximum moves, which produces two
-;  odd behaviours:
+;  Nothing recalculates that offset when the maximum moves, which produces three
+;  symptoms of one defect:
 ;
 ;    1. Casting Fortify Magicka or Fortify Intelligence RAISES your current
 ;       Magicka by the full amount. At 100/300, a +300 buff gives you 400/600 -
 ;       300 points of Magicka out of thin air.
 ;
-;    2. When the buff expires, the same amount is subtracted from current AND
-;       maximum. At 100/600 that leaves you at -200/300: no spellcasting at all
-;       until natural regeneration climbs back to zero.
+;    2. When the buff expires, the same amount is taken back, even if you were
+;       nowhere near full.
 ;
-;  Note that vanilla is inconsistent here, and has been since 2006. Fortify
-;  Magicka is documented as unable to reduce current Magicka below zero, while
-;  Fortify Intelligence explicitly can. Two effects, opposite rules, same
-;  observable result.
-;    https://en.uesp.net/wiki/Oblivion:Spell_Making
+;    3. So the pool can go negative. At 100/600 the buff ending leaves you at
+;       -200/300: no spellcasting at all until regeneration climbs back to zero.
+;
+;  For the original game, UESP documents Fortify Magicka as unable to take
+;  current Magicka below zero when it ends, while Fortify Intelligence can.
+;  In Remastered, a spell carrying both, ending at a low pool, was measured
+;  going from 52 to -248: the whole 300 taken back.
+;    https://en.uesp.net/wiki/Oblivion:Spell_Making#Spell_Chaining
 ;
 ;  THE MODEL: A GLASS OF WATER
 ;  ---------------------------
@@ -175,8 +177,8 @@ R"CONF(; =======================================================================
 ;    100/600, buff ends   ->  100/300   (vanilla: -200/300)
 ;    350/600, buff ends   ->  300/300   (vanilla: 50/300)
 ;
-;  WHAT IT COSTS - READ THIS BEFORE COMPLAINING
-;  --------------------------------------------
+;  WHAT IT COSTS - READ THIS FIRST
+;  -------------------------------
 ;  Preset 2 removes free Magicka on activation. It is a fix, and like any fix
 ;  that closes an exploit, it changes the balance for whoever relied on it.
 ;  Two consequences you should know about:
@@ -187,10 +189,13 @@ R"CONF(; =======================================================================
 ;
 ;        regen/sec = 2 * (Willpower/50)^2 + 1.5 * (Willpower/50)
 ;        halved while in combat, and paused for 2 seconds after each cast
-;        https://en.uesp.net/wiki/Oblivion:Willpower
+;        https://en.uesp.net/wiki/Oblivion:Willpower ("Oblivion Remastered")
+;
+;    That is the formula the plugin's own measurements confirm. Two other UESP
+;    pages give different ones; docs/SPEC.md section 3.3 has the comparison.
 ;
 ;    Willpower 100 -> 11.0/sec out of combat, 5.5/sec in combat.
-;    Willpower 150 -> 22.5/sec out of combat, 11.2/sec in combat.
+;    Willpower 150 -> 22.5/sec out of combat, 11.25/sec in combat.
 ;    Willpower 200 -> 38.0/sec out of combat, 19.0/sec in combat.
 ;
 ;    That curve is quadratic, so Fortify Willpower is by far the cheapest way
@@ -208,9 +213,12 @@ R"CONF(; =======================================================================
 ;    Magicka, so it changes how fast the glass fills, never its size.
 ;    https://en.uesp.net/wiki/Oblivion:Vampirism
 ;
-;    So casting Fortify Willpower FIRST is what makes this playable. If you
-;    only fortify Magicka, filling +300 in combat at Willpower 100 takes about
-;    55 seconds and your buff will expire long before that.
+;    So fortifying Willpower is what makes this playable. If you only fortify
+;    Magicka, filling +300 in combat at Willpower 100 takes about 55 seconds,
+;    and the buff may well expire first. In Remastered one spell can carry
+;    several Fortify Attribute effects, so Fortify Willpower can ride along
+;    with Fortify Intelligence.
+;      https://en.uesp.net/wiki/Oblivion:Spell_Making
 ;
 ;  * Spell chaining stops working. UESP documents loops built on the free
 ;    Magicka of Fortify effects, and on Drain Magicka turning a negative pool
@@ -221,7 +229,7 @@ R"CONF(; =======================================================================
 ;    pool. If you rely on those, set iPreset = 0.
 ;
 ;  If none of that appeals to you, set iPreset = 1: it only stops current
-;  Magicka from going negative and changes nothing else.
+;  Magicka from going negative, and keeps the free Magicka (see its note).
 ;
 ; ============================================================================
 
@@ -364,6 +372,9 @@ iMaxLines = 200000
 ;      offset in iMagickaModifier below.
 ;   Same method for the per-attribute arrays: toggle a Fortify buff on and off
 ;   and watch which array entries move.
+;
+; bEnabled turns on the automatic memory dumps of the player object at startup.
+; They are written at iLevel = 3 only. The dump key below works at any level.
 bEnabled = 1
 
 ; Dump the player structure when the key below is pressed.
@@ -393,8 +404,9 @@ iDumpTo   = 0xB88
 ; Changes are reported at Debug level, and always on a manual dump.
 bFloatWatch = 1
 
-; List every module loaded in the game process at startup, which is how you check
-; whether another mod is present alongside this one.
+; At startup, write the loaders and mods found in the game process, one line,
+; each with the timestamp of its own file (every module at iLevel = 3). This is
+; how a log shows what else is installed.
 bModuleInventory = 1
 
 ; Fallback search for the player object.
@@ -407,52 +419,25 @@ bModuleInventory = 1
 ; the log says no player instance was found long after a save was loaded.
 bHeapScan = 0
 
-; Call the game's virtual functions (GetActorFloatValue) to read Magicka.
+; Call the game's own GetActorFloatValue to read Magicka. Leave this at 0.
 ;
-; Reading raw memory cannot crash the game here, because every read goes through
-; ReadProcessMemory and an unmapped page returns a failure instead of faulting.
-; CALLING a function at a vtable index that a game update has moved absolutely can
-; crash, which is why this is a separate switch. The intended sequence is:
+; On this game build (PE timestamp 0xF19077A4) that call cannot be made from
+; the plugin's thread. Two runs on 6 August 2026 showed it:
+;   - version 0.3.1 called it once, and the call never returned. The plugin's
+;     thread was lost; the game carried on.
+;   - version 0.4.0 called it again, on a throwaway thread with a 2 second
+;     timeout. It faulted inside game code (a write to address zero, module
+;     offset 0x458F57C) and the game ended with a UE4SS "Fatal Error".
+; A timeout survives a hang. Nothing survives a fault: an access violation
+; belongs to the whole process.
 ;
-;   Calling the game's own accessor is DISABLED and should stay that way on this
-;   game build. Two field runs settled it. On 6 August 2026 a call to vtable index
-;   0x0B1 was entered and never returned; a second run, guarded by a timeout on a
-;   throwaway thread, faulted inside game code with a write to address zero at
-;   module offset 0x458F57C on executable timestamp 0xF19077A4. A timeout survives
-;   a hang, but no timeout survives a fault: an access violation belongs to the
-;   whole process, so the game dies with it. Setting this to 1 on this build is a
-;   reliable way to crash.
+; Nothing needs it. Current Magicka is not stored: the engine keeps a deficit
+; and computes current = maximum + deficit on demand, and the change in maximum
+; follows from the modifier arrays. Reading memory is enough.
 ;
-;   You do not need it. The same field run showed that during twenty-four seconds
-;   of pure Magicka regeneration, exactly two floats in the whole watched window
-;   moved, and neither was current Magicka -- because current Magicka is not
-;   stored. The engine keeps only the deficit and derives current = maximum +
-;   deficit on demand. The change in maximum is computable from the modifier
-;   arrays alone, so reading memory is sufficient and calling into the game buys
-;   nothing.
-;
-; History, so nobody re-enables this hoping for a different outcome. Version 0.3.1
-; entered the call and never came back: the observation thread was lost while the
-; game itself carried on for minutes, with no crash dialog and no dump. Version
-; 0.4.0 made that survivable -- the call is attempted once only, after the player
-; object is populated and a settling delay, on a throwaway thread with a timeout,
-; and a sentinel file MagickaPoolFix.vcall is written before the attempt and removed
-; after it returns, so a launch that never comes back disables this option for the
-; next one.
-;
-; That guard then caught the real failure. On 6 August 2026 the guarded call faulted
-; inside game code with a write to address zero at module offset 0x458F57C, and
-; UE4SS wrote a crash dump in the same second. A later run on the same build merely
-; hung instead. The same call therefore either hangs or faults depending on the run,
-; which is what you would expect from a function that dereferences a context pointer
-; only valid on the game thread.
-;
-; A timeout survives a hang. Nothing survives a fault: an access violation belongs
-; to the whole process, so the game dies with it. Setting this to 1 on this build is
-; a reliable way to lose your session.
-;
-; Leave it at 0. Everything the project needs comes from reading memory, which never
-; depends on this option.
+; If a launch ever starts the call and does not record its return, the file
+; MagickaPoolFix.vcall is left next to the plugin, and the next launch forces
+; this option to 0. Deleting that file re-arms the attempt.
 bCallVirtuals = 0
 
 ; How often the observation thread samples the player, in milliseconds. 16 is
@@ -463,11 +448,13 @@ iPollIntervalMs = 16
 [Offsets]
 
 ; -1 means "use the value compiled into this build", shown in the comment.
-; Only touch these if a game update moved the structure and the log tells you
-; the invariant self-test failed. Use the probe above to find the new values.
+; Only touch these after a game update, if the log's first line says the game
+; is not the validated build and the DECISION lines no longer match what your
+; Magicka bar does. Use the probe above to find the new values.
 ;
 ; Source of the compiled defaults: reverse-engineered headers from
 ;   https://github.com/libxse/commonlibob64/blob/main/include/RE/P/PlayerCharacter.h
+; confirmed in game on the executable with PE timestamp 0xF19077A4.
 
 iMagickaModifier    = -1       ; 0x6B8, float, <= 0
 iMagicAVModifiers   = -1       ; 0x474, float[72], magic-sourced modifiers
@@ -476,11 +463,9 @@ iGameAVModifiers    = -1       ; 0x6C0, float[72]
 iUpdateVtableIndex  = -1       ; 0x099, PlayerCharacter::Update(float)
 iGetActorFloatValue = -1       ; 0x0B1, PlayerCharacter::GetActorFloatValue(int)
 
-; What GetActorFloatValue(Magicka) returns. The plugin normally determines this
-; by itself in a fraction of a second, by watching which of the two candidate
-; maximums stays constant while the modifier moves. Leave it on auto unless the
-; log says calibration failed.
-;   0 = auto-calibrate (recommended)
+; What GetActorFloatValue(Magicka) returns, for the calibration that runs only
+; when bCallVirtuals = 1, which this game build does not allow. Leave it at 0.
+;   0 = auto-calibrate
 ;   1 = it returns CURRENT magicka
 ;   2 = it returns MAXIMUM magicka
 iForceHypothesis = 0
