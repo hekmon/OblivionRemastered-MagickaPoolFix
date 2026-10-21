@@ -168,6 +168,57 @@ struct Stats {
     unsigned long long dumps         = 0;
 } g_stats;
 
+// The plugin's own cost, reported by the heartbeat, so that "the game feels
+// slower" can be checked against numbers. Wall time on the plugin's thread from
+// the end of one Sleep to the start of the next; the memory map refresh, a walk of
+// the whole address space every 2 s, is also timed on its own.
+struct Cost {
+    long long freq = 0;            // QueryPerformanceFrequency, ticks per second
+    long long windowStart = 0;     // start of the current heartbeat window
+    long long busy = 0;            // ticks spent working in the window
+    long long refresh = 0;         // ticks spent in memory map refreshes
+    long long refreshMax = 0;
+    unsigned  refreshes = 0;
+} g_cost;
+
+long long QpcNow() {
+    LARGE_INTEGER t;
+    QueryPerformanceCounter(&t);
+    return t.QuadPart;
+}
+
+// Times one loop iteration; the destructor runs on every `continue`.
+struct BusyScope {
+    long long start = QpcNow();
+    ~BusyScope() { g_cost.busy += QpcNow() - start; }
+};
+
+// " | own time ..." for the heartbeat, then a new window starts.
+std::string CostText() {
+    const long long now = QpcNow();
+    std::string out;
+    if (g_cost.freq > 0 && now > g_cost.windowStart) {
+        const double ms = 1000.0 / static_cast<double>(g_cost.freq);
+        const double windowS = static_cast<double>(now - g_cost.windowStart) /
+                               static_cast<double>(g_cost.freq);
+        char buf[160];
+        std::snprintf(buf, sizeof(buf),
+                      " | own time %.2f ms per second, memory map refresh %.2f ms avg "
+                      "%.2f ms max (x%u)",
+                      static_cast<double>(g_cost.busy) * ms / windowS,
+                      g_cost.refreshes ? static_cast<double>(g_cost.refresh) * ms /
+                                             g_cost.refreshes
+                                       : 0.0,
+                      static_cast<double>(g_cost.refreshMax) * ms, g_cost.refreshes);
+        out = buf;
+    }
+    const long long freq = g_cost.freq;
+    g_cost = Cost{};
+    g_cost.freq = freq;
+    g_cost.windowStart = now;
+    return out;
+}
+
 using GetActorFloatValueFn = float (MPF_CALL*)(void* self, std::int32_t av);
 
 // Minimum number of plausible non-zero floats in the observation window for the
@@ -234,7 +285,9 @@ void LogModuleInventory() {
         for (auto& c : lower) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
         const bool system = !winDir.empty() && lower.compare(0, winDir.size(), winDir) == 0;
         if (_stricmp(r.name.c_str(), MPF_PLUGIN_NAME ".asi") == 0) { ++selfCopies; }
-        if (system || r.base == g_game.Base()) { continue; }
+        // A module with no path was unloaded between the enumeration and the
+        // query; it has nothing useful to print.
+        if (system || r.base == g_game.Base() || r.path.empty()) { continue; }
         std::uint32_t ts = 0;
         char entry[400];
         const std::string where = mpf::RelativeTo(r.path, g_gameDir);
@@ -653,8 +706,24 @@ void ReportOffsets() {
 // anything lives in Corrector.h and is unit tested; this function is the plumbing
 // around it -- calibrate, decide, log, write, verify.
 // --------------------------------------------------------------------------
+// Defined after the character reader, below.
+bool EstimateMaxNow(float& out);
+
 void HandleTransition(const mpf::Transition& t) {
     ++g_stats.maxChanges;
+
+    // Current and maximum, estimated, so a log shows whether the pool went below zero
+    // (docs/SPEC.md section 10.5). current = maximum + deficit.
+    float maxNow = 0.0f;
+    const bool haveMax = EstimateMaxNow(maxNow);
+    if (haveMax) {
+        const float maxBefore = maxNow - t.deltaMax;
+        MPF_INFO("  estimated magicka current/max: before %.1f / %.1f, as the engine left "
+                 "it %.1f / %.1f",
+                 static_cast<double>(maxBefore + t.deficitBefore),
+                 static_cast<double>(maxBefore),
+                 static_cast<double>(maxNow + t.deficitAfter), static_cast<double>(maxNow));
+    }
 
     // A floor at zero applied by the engine would make the correction below overshoot
     // by about this amount (Corrector.h, docs/SPEC.md section 10.5). Not observed so
@@ -744,8 +813,14 @@ void HandleTransition(const mpf::Transition& t) {
     // transition.
     g_model.NoteDeficitWrite(d.newDeficit);
     ++g_stats.corrected;
-    MPF_INFO("  WRITE OK: +0x%03X now reads %.4f", static_cast<unsigned>(g_offMod),
-             static_cast<double>(d.newDeficit));
+    if (haveMax) {
+        MPF_INFO("  WRITE OK: +0x%03X now reads %.4f, estimated magicka %.1f / %.1f",
+                 static_cast<unsigned>(g_offMod), static_cast<double>(d.newDeficit),
+                 static_cast<double>(maxNow + d.newDeficit), static_cast<double>(maxNow));
+    } else {
+        MPF_INFO("  WRITE OK: +0x%03X now reads %.4f", static_cast<unsigned>(g_offMod),
+                 static_cast<double>(d.newDeficit));
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -813,9 +888,27 @@ const char* ReadCharacter(mpf::BaseStats& s, CharacterIds& ids) {
     return nullptr;
 }
 
+// The estimated maximum right now (docs/SPEC.md section 10.8), or false when the
+// character data cannot be read. For the log only.
+bool EstimateMaxNow(float& out) {
+    mpf::BaseStats s;
+    CharacterIds   ids;
+    float          intMod = 0.0f, magMod = 0.0f;
+    if (ReadCharacter(s, ids) != nullptr ||
+        !TotalAvModifier(g_player, mpf::kAV_Intelligence, intMod) ||
+        !TotalAvModifier(g_player, mpf::kAV_Magicka, magMod)) {
+        return false;
+    }
+    out = mpf::EstimatedMaxMagicka(static_cast<float>(s.attribute[mpf::kAV_Intelligence]),
+                                   intMod, static_cast<float>(s.spellPoints), magMod);
+    return true;
+}
+
+// The modifier with its magic / script / game split when not all of it is magic.
 std::string ModifierOf(int av) {
-    float v = 0.0f;
-    return TotalAvModifier(g_player, av, v) ? mpf::FormatModifier(v) : std::string("?");
+    float src[3];
+    return ReadAvSources(g_player, av, src) ? mpf::FormatModifierSources(src)
+                                           : std::string("?");
 }
 
 const char* PoolState(float deficit) { return deficit >= -0.01f ? "full" : "not full"; }
@@ -831,12 +924,13 @@ void LogCharacter(const mpf::BaseStats& s, const CharacterIds& ids, float defici
 
     std::string line;
     for (int i = 0; i < mpf::kAttributeCount; ++i) {
-        char buf[48];
+        char buf[96];
         std::snprintf(buf, sizeof(buf), "%s%s %u/%s", i ? ", " : "", mpf::AttributeName(i),
                       s.attribute[i], ModifierOf(i).c_str());
         line += buf;
     }
-    MPF_INFO("PLAYER attributes base/modifier: %s", line.c_str());
+    MPF_INFO("PLAYER attributes base/modifier (m/s/g = magic/script/game, shown when not "
+             "all magic): %s", line.c_str());
 
     // Skills in actor-value order, which is also combat / magic / stealth, seven each.
     // The letter is the mastery the BASE skill gives (N, A, J, E, M).
@@ -845,7 +939,7 @@ void LogCharacter(const mpf::BaseStats& s, const CharacterIds& ids, float defici
         line.clear();
         for (int k = 0; k < 7; ++k) {
             const int i = g * 7 + k;
-            char buf[64];
+            char buf[112];
             std::snprintf(buf, sizeof(buf), "%s%s %u/%s %c", k ? ", " : "",
                           mpf::SkillName(i), s.skill[i],
                           ModifierOf(mpf::kFirstSkillAV + i).c_str(),
@@ -858,6 +952,12 @@ void LogCharacter(const mpf::BaseStats& s, const CharacterIds& ids, float defici
     MPF_INFO("PLAYER derived modifiers: Health %s, Magicka %s, Fatigue %s, Encumbrance %s",
              ModifierOf(mpf::kAV_Health).c_str(), ModifierOf(mpf::kAV_Magicka).c_str(),
              ModifierOf(mpf::kAV_Fatigue).c_str(), ModifierOf(mpf::kAV_Encumbrance).c_str());
+    float maxNow = 0.0f;
+    if (EstimateMaxNow(maxNow)) {
+        MPF_INFO("PLAYER estimated magicka %.1f / %.1f (maximum = 2 x Intelligence + base "
+                 "spell points + Magicka modifier; compare with the character sheet)",
+                 static_cast<double>(maxNow + deficit), static_cast<double>(maxNow));
+    }
 }
 
 // One line per kind of change. The deficit is printed before and after, because
@@ -924,18 +1024,19 @@ void Heartbeat(const char* hypothesisName, float v, float mod, bool haveV) {
         MPF_INFO("alive | samples=%llu maxChanges=%llu corrected=%llu "
                  "wouldCorrect=%llu policy=%s | "
                  "hypothesis=%s | value=%.2f modifier=%.2f | watch=%llu "
-                 "rescans=%llu lost=%llu",
+                 "rescans=%llu lost=%llu%s",
                  g_stats.samples, g_stats.maxChanges, g_stats.corrected,
                  g_stats.wouldCorrect,
                  mpf::PolicyName(g_policy.Policy()),
                  hypothesisName, static_cast<double>(v), static_cast<double>(mod),
-                 g_stats.watchChanges, g_stats.rescans, g_stats.instanceLost);
+                 g_stats.watchChanges, g_stats.rescans, g_stats.instanceLost,
+                 CostText().c_str());
     } else {
         MPF_INFO("alive | samples=%llu | player=%s | modifier=%.2f | watch=%llu "
-                 "rescans=%llu lost=%llu | virtual calls disabled",
+                 "rescans=%llu lost=%llu | virtual calls disabled%s",
                  g_stats.samples, g_player ? "found" : "not found",
                  static_cast<double>(mod), g_stats.watchChanges, g_stats.rescans,
-                 g_stats.instanceLost);
+                 g_stats.instanceLost, CostText().c_str());
     }
 }
 
@@ -991,22 +1092,35 @@ void ObserveLoop() {
 
     const auto cfgComp = g_cfg.Resolve();
 
+    {
+        LARGE_INTEGER f;
+        QueryPerformanceFrequency(&f);
+        g_cost.freq = f.QuadPart;
+        g_cost.windowStart = QpcNow();
+    }
+
     while (!g_stop.load(std::memory_order_relaxed)) {
         Sleep(static_cast<DWORD>(g_cfg.pollIntervalMs));
+        const BusyScope busy;
         const unsigned long long now = GetTickCount64();
 
         // Refresh the page snapshot periodically: the heap grows and shrinks, and
         // a stale snapshot would make valid reads look unreadable.
         if (now - lastRefresh > 2000) {
+            const long long t0 = QpcNow();
             g_mem.Refresh();
+            const long long dt = QpcNow() - t0;
+            g_cost.refresh += dt;
+            if (dt > g_cost.refreshMax) { g_cost.refreshMax = dt; }
+            ++g_cost.refreshes;
             lastRefresh = now;
         }
 
         if (!InstanceStillValid()) {
             if (g_player) {
                 ++g_stats.instanceLost;
-                MPF_INFO("player instance at 0x%llX is no longer valid (save load, "
-                         "or the object moved). Rescanning.",
+                MPF_INFO("player instance at 0x%llX is no longer valid (a save load, "
+                         "a quit to the main menu, or the game closing). Rescanning.",
                          static_cast<unsigned long long>(g_player));
                 g_player = 0;
                 g_watch.Reset();

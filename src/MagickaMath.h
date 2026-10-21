@@ -148,6 +148,18 @@ enum class MaxChangeBehaviour {
 // out of any difference. https://en.uesp.net/wiki/Oblivion:Magicka
 inline constexpr float kMagickaPerIntelligence = 2.0f;
 
+// The absolute maximum, estimated: 2 x (base Intelligence + its modifier total) +
+// the base form's spell points + the Magicka modifier total. The base values come
+// from the player's base form, where the race and birthsign bonuses already sit
+// (docs/SPEC.md section 10.8). Checked once against the character sheet, 21 October
+// 2026: 2 x (100 + 111) + 100 + 100 = 622, as shown in game. Log only: the
+// correction never uses it, it works on changes of the maximum.
+inline float EstimatedMaxMagicka(float baseInt, float intModifier, float baseSpellPoints,
+                                 float magickaModifier) {
+    return kMagickaPerIntelligence * (baseInt + intModifier) + baseSpellPoints +
+           magickaModifier;
+}
+
 // dMax          change in maximum Magicka, computed from the modifier arrays
 // dMod          change the engine applied to the deficit over the same transition
 // modBefore     the deficit BEFORE the transition; zero means the pool was full

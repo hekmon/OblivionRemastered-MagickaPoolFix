@@ -2505,3 +2505,57 @@ human-directed. Code and docs by Claude (Anthropic); scope, decisions and every 
 test by me."
 
 Built: 183 OK (7 new), 0 FAIL, 0 warnings, imports unchanged. Not run in game.
+
+## 21 October 2026 — first sessions with 1.0.0-dev; the character data checked
+
+Two short sessions (SPEC §4.9), the first with OblivionRemasteredPerformanceFix 1.1.0 as
+`version.dll` and the ASI loader renamed to `winmm.dll`. Startup clean both times. Session
+1: ring off and on at a full pool, then the +300 spell; three transitions, every decision
+the rule's, two writes, no failure. Session 2: the quick save loaded with the spell still
+running, no transition, and the maintainer took 15 screenshots.
+
+**Character data validated** (SPEC §10.8): level, the 8 attributes and the 21 skills all
+equal base + modifier on the sheet; maximum magicka 622 = 2 × 211 + 100 + 100.
+
+Settled from the screenshots:
+
+- the +10 on every attribute (6 August) is the ring of perfection;
+- the Intelligence +2 of 28 August is the Scales of Pitiless Justice (UESP: Str, Agi, Int
+  +2, Per −2, by script while carried);
+- the spell is Fortify Intelligence, Willpower and Magicka 100, cost 278 with Restoration
+  +0 and base Luck 63, which the fit of SPEC §4.7.3 predicted.
+
+`[DEDUCTION]`s, written as such in the SPEC:
+
+- ability bonuses (race, birthsign, vampirism stage, Gray Prince) sit in the base values,
+  not in the modifier arrays. That explains base spell points 100 and the base values of
+  110; it adds a blind spot to §10.3 (an ability changing Intelligence or Magicka);
+- the "Boucle pentamagique" is the Restoration +5 item (its name, and the +5 on five
+  school actor values in the 6 August dump), and the 28 August swap at 21:29 was a ring
+  swap with both slots full.
+
+Open: whether the spell cost uses Luck with or without its Fortify (a cast with the ring
+off settles it), and a −1 on Intelligence, Agility, Willpower and Speed with no visible
+source.
+
+**Corrected in conversation, not in the docs:** I first told the maintainer that the
+ability bonuses were invisible to the plugin. They are in the base values it reads.
+
+The session felt laggy; the maintainer puts it down to a shader rebuild and DLSS variable
+rate. The plugin's polling is the same as 0.9.1's (about 3,400 samples a minute in both
+logs). To have numbers rather than impressions, this build reports its own time.
+
+Log-only changes in this build (still 1.0.0-dev):
+
+- PLAYER lines: each modifier's magic / script / game split when not all magic,
+  `+22 (m+20 s+2)` (`FormatModifierSources`, tested);
+- `PLAYER estimated magicka current / max`, and the same estimate on every transition
+  and after every write (`EstimatedMaxMagicka`, tested against the sheet's 622), for the
+  drain question of SPEC §10.5;
+- heartbeat: the plugin's own time per second, and the memory map refresh, average and
+  maximum;
+- the mods line skips modules with no path (two empty entries in session 1);
+- "player instance no longer valid" also names a quit to the menu and the game closing.
+
+Built: 190 OK (7 new), 0 FAIL, 0 warnings, imports unchanged, `.conf` byte-identical. Not
+run in game.

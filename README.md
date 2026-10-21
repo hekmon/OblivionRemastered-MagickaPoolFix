@@ -1,4 +1,4 @@
-# MagickaPoolFix
+# Oblivion Remastered - Magicka Pool Fix
 
 An ASI plugin for **The Elder Scrolls IV: Oblivion Remastered** that keeps current magicka
 consistent when maximum magicka changes.
@@ -216,8 +216,8 @@ only ever sees changes of the maximum, which is why the rule above is relative.
 
 Since 1.0.0-dev the plugin also reads, without writing, the character's level, base
 attributes and base skills from the player's base form, after checking its form IDs and
-vtable. Those offsets are not validated in game yet ([`docs/SPEC.md`](docs/SPEC.md) section
-10.8); nothing in the correction depends on them.
+vtable. Those offsets were checked against the character sheet in game on 21 October 2026
+([`docs/SPEC.md`](docs/SPEC.md) section 10.8); nothing in the correction depends on them.
 
 ## Running a test build
 
@@ -292,7 +292,8 @@ profile folder replaced by `%USERPROFILE%`.
   [OblivionRemasteredPerformanceFix](https://github.com/LTSharpe/OblivionRemasteredPerformanceFix):
   only one file can be named `version.dll`. Ultimate ASI Loader also works under other
   names; the Steam executable imports `winmm.dll`, so renaming the loader to `winmm.dll`
-  frees `version.dll` for the other mod. Not yet tested in game with this plugin.
+  frees `version.dll` for the other mod. Tested with OblivionRemasteredPerformanceFix 1.1.0
+  in two short sessions: no interference seen.
 
 ## Limitations
 
@@ -448,8 +449,8 @@ contributor reads. Commits written by Claude carry a `Co-Authored-By: Claude` tr
 - **[commonlibob64](https://github.com/libxse/commonlibob64)** (libxse), the
   reverse-engineered layout of the game's classes. Every memory offset this plugin uses
   comes from its headers. The offsets the correction relies on were confirmed in game
-  ([`docs/SPEC.md`](docs/SPEC.md) chapter 3); those of the character data are still being
-  validated (section 10.8). The plugin does not build against it and contains none of its
+  ([`docs/SPEC.md`](docs/SPEC.md) chapter 3), and those of the character data against the
+  character sheet (section 10.8). The plugin does not build against it and contains none of its
   code: only offsets, quoted with their source. commonlibob64 is GPL-3.0.
 - **Baestus**, author of the two uncappers this plugin was born alongside:
   [Skill Damage Scaling Cap Remover](https://github.com/Baestus/OBSE64_Skill_Damage_Scaling_Cap_Remover)

@@ -141,6 +141,23 @@ int main()
     Check("modifier -99.55", mpf::FormatModifier(-99.55f), std::string("-99.55"));
     Check("modifier +100.0001 reads as whole", mpf::FormatModifier(100.0001f), std::string("+100"));
 
+    {
+        const float magicOnly[3] = {20.0f, 0.0f, 0.0f};
+        const float none[3]      = {0.0f, 0.0f, 0.0f};
+        const float scales[3]    = {20.0f, 2.0f, 0.0f};        // Str on 21 Oct 2026
+        const float cancel[3]    = {2.0f, 0.0f, -2.0f};
+        const float scriptOnly[3] = {0.0f, -2.0f, 0.0f};       // Per, Scales alone
+        Check("sources: magic only prints the total",
+              mpf::FormatModifierSources(magicOnly), std::string("+20"));
+        Check("sources: nothing at all", mpf::FormatModifierSources(none), std::string("+0"));
+        Check("sources: magic and script split",
+              mpf::FormatModifierSources(scales), std::string("+22 (m+20 s+2)"));
+        Check("sources: zero total that is not empty",
+              mpf::FormatModifierSources(cancel), std::string("+0 (m+2 g-2)"));
+        Check("sources: script only",
+              mpf::FormatModifierSources(scriptOnly), std::string("-2 (s-2)"));
+    }
+
     std::printf("\n-- path anonymisation --------------------------------------------\n");
     const std::string prof = "C:\\Users\\Ann";
     Check("profile prefix replaced",

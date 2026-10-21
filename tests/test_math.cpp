@@ -256,6 +256,15 @@ int main()
         ChangeMax(s, 300.0f, soft, true);
         Check("soft: expiry floors at 0 instead of -200", s.Current(), 0.0f);
     }
+    {
+        // The estimated maximum against the character sheet of 21 October 2026:
+        // base Int 100, Int modifier +111, base spell points 100, Magicka +100.
+        Check("estimate: the sheet's 622",
+              mpf::EstimatedMaxMagicka(100.0f, 111.0f, 100.0f, 100.0f), 622.0f);
+        // Same character an hour earlier, ring on, no buff: 2 x 111 + 100.
+        Check("estimate: without the buff",
+              mpf::EstimatedMaxMagicka(100.0f, 11.0f, 100.0f, 0.0f), 322.0f);
+    }
 
     std::printf("\n%s\n", g_fail == 0 ? "ALL TESTS PASS" : "SOME TESTS FAILED");
     return g_fail == 0 ? 0 : 1;

@@ -24,8 +24,8 @@
 // base-class offsets summed from their declared sizes. The field order matches
 // the NPC_ record format (ACBS, DATA) documented on UESP. Form IDs 0x14 and 0x07:
 // UESP Oblivion:Player and CS wiki "Player". Actor-value order: CS wiki
-// "Stats List". All of it is [DEDUCTION] until a log is checked against the
-// character sheet in game: docs/SPEC.md section 10.8.
+// "Stats List". Checked against the character sheet in game on 21 October 2026
+// (level, attributes, skills, spell points): docs/SPEC.md section 10.8.
 
 #pragma once
 
@@ -170,6 +170,27 @@ inline std::string FormatModifier(float v) {
         std::snprintf(buf, sizeof(buf), "%+.2f", static_cast<double>(v));
     }
     return buf;
+}
+
+// A modifier with where it comes from, for the PLAYER lines. src[] is the
+// magic / script / game split read from the three modifier arrays. Most bonuses
+// are spells and enchantments, so a modifier that comes from the magic array only
+// prints as before ("+22"); anything else adds the split, skipping zeros:
+// "+22 (m+20 s+2)". The Scales of Pitiless Justice, for instance, change
+// attributes through a script (UESP), so they should show under s.
+inline std::string FormatModifierSources(const float src[3]) {
+    static const char kTag[3] = {'m', 's', 'g'};
+    const auto nonZero = [](float v) { return v >= 0.005f || v <= -0.005f; };
+    std::string out = FormatModifier(src[0] + src[1] + src[2]);
+    if (!nonZero(src[1]) && !nonZero(src[2])) { return out; }
+    std::string split;
+    for (int i = 0; i < 3; ++i) {
+        if (!nonZero(src[i])) { continue; }
+        if (!split.empty()) { split += ' '; }
+        split += kTag[i];
+        split += FormatModifier(src[i]);
+    }
+    return out + " (" + split + ")";
 }
 
 // True when `path` lies inside the folder `base` (or is `base` itself), compared

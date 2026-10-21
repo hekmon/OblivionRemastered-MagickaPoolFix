@@ -165,14 +165,18 @@ the magic modifier array (`+0x0474` to `+0x0490`, `FIELD-JOURNAL.md`, 6 August 2
 0.4.0-probe). Vampirism fortifies only Strength, Speed and Willpower, by +5, +10, +15 or
 +20 depending on the stage ([UESP, Vampirism](https://en.uesp.net/wiki/Oblivion:Vampirism)),
 so a +10 on Intelligence, Agility, Endurance, Personality and Luck is something else.
-`[DEDUCTION]`: an item or effect fortifying every attribute by 10. A vampirism bonus on
+`[DEDUCTION]`: an item or effect fortifying every attribute by 10. **Identified on
+21 October 2026**: the ring the game calls "Anneau de perfection" in French, whose item
+screen lists Fortify +10 on each of the eight attributes. A vampirism bonus on
 top of it would have given Willpower 115 or more and at least 14.03 /s, so none was in
 effect during that measurement. Withdrawn: "the +10 corresponds to the 50% stage".
 
 The test character is a vampire, so its rate can still swing with the stage: from 12.98 /s
 (Willpower 110, no stage bonus) to 17.42 /s (Willpower 130, +20), by the formula above.
-Which stage the character was at on any given day is not in the logs. The 1.0.0-dev log
-prints the Willpower modifier with each character block (§10.8).
+Which stage the character was at on any given day is not in the logs. On 21 October 2026
+the Active Effects screen showed Vampirism 50, the 50 % stage, and its +10 appears to sit
+in the **base** Willpower the log reads (110 = 100 + 10), not in a modifier (§10.8,
+`[DEDUCTION]`).
 
 Practical consequence: an overdraft of 250 points costs 19 seconds of waiting before
 the first point of magicka is spendable again.
@@ -505,6 +509,26 @@ and the skill passed to the cost formula including Fortify Restoration. The char
 block of the 1.0.0-dev log (§10.8) shows both the Luck and the Restoration modifier, so
 the first session with it can check this.
 
+**Checked 21 October 2026, partly.** The character block (§10.8) shows base Luck **63**
+and a Restoration modifier of **+0**, and the same spell cost **278** (§4.9). Both agree
+with the fit: with `S = 100 + 0.4 × (63 − 50) = 105.2`, a cost of 278 gives a base cost of
+about **1462** (1459.7 to 1464.9 if the game rounds), inside 1460.7 to 1471.5.
+
+One question is open. The ring of §3.3 adds **+10 Luck**, and it was worn for that cast.
+With the Luck the character sheet shows, 73, `S = 109.2` and the base cost would be about
+1518, outside the fit. Either the cost formula takes Luck **without** its Fortify, or the
+fit's anchor (Luck 59 on 6 August) was itself read with the ring on, which would shift
+every Luck in the fit by 10. The second would need base Luck 53 on 28 August and 63 by
+21 October, ten points in four levels at most one per level (UESP, Remastered Leveling),
+so it is unlikely. `[DEDUCTION]`, to be settled by one cast with the ring off: same cost
+means Luck's Fortify does not count.
+
+The Restoration +5 of 6 August and early 28 August has a likely source: the character
+owns a "Boucle pentamagique" (French game text, "pentamagic"), and the dump of §3.4 had
+`+5.0` on exactly five actor values, 21 to 25, Conjuration to Restoration, the five
+schools that fit the name. `[DEDUCTION]` from the name alone; its item screen has not been
+seen.
+
 This does not affect the correction, which never reads the spell cost.
 
 #### 4.7.4 Stability
@@ -580,6 +604,45 @@ What this session adds:
 Not covered by this session, despite the 17 transitions: every expiry happened with the
 pool full, and the item swap also happened with the pool full. Scenarios 5 and 6 of
 chapter 8 remain open.
+
+Read again on 21 October 2026, with the character's equipment seen in game (§4.9):
+
+- The **+2 Intelligence** besides the ring is the Scales of Pitiless Justice, carried:
+  Strength, Agility and Intelligence +2, Personality −2, applied by script while they are
+  in the inventory ([UESP, Scales of Pitiless Justice](https://en.uesp.net/wiki/Oblivion:Scales_of_Pitiless_Justice)).
+- Events 5 and 6 fit a ring swap with both ring slots full, `[DEDUCTION]`: putting on the
+  Eidolon ring (Blade and Block +15, no Intelligence) pushed out the ring of perfection
+  (event 5); putting that one back pushed out the "Boucle pentamagique", taking the
+  Restoration +5 with it, which no transition shows because Restoration does not move the
+  maximum. That is the 266 → 278 of the cost.
+
+### 4.9 Sessions of 21 October 2026 (1.0.0-dev)
+
+Two short sessions on the test bench, now with OblivionRemasteredPerformanceFix (§10.7).
+First line both times: `ACTIVE`, PE `0xF19077A4 (validated build)`, `conf found`, no
+setting away from its default. Player found 41 s and 11 s after start. Both logs end on
+"player instance ... no longer valid" when the player quit; the game closed before the
+next heartbeat, so nothing followed. That message named only a save load or a moved
+object; it now also names a quit and the game closing.
+
+Session 1, 7 minutes, three transitions, all with the pool full:
+
+| # | time | Int modifier | Magicka modifier | Δmax | engine left (Δd) | written | verdict | cause |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 20:51:01 | 11 → 1 | 0 | −20 | 0 | — | SPILLED | ring of perfection removed |
+| 2 | 20:51:02 | 1 → 11 | 0 | +20 | 0 (0) | −20 | FREE MAGICKA | put back 1.25 s later |
+| 3 | 20:53:51 | 11 → 111 | 0 → 100 | +300 | −278 (−278) | −578 | PARTIAL | the +300 spell, cost 278 |
+
+All three decisions are the rule of chapter 5. The ring round trip at a full pool cost
+20 points, the water above the new rim (§5): intended, and regenerated in seconds.
+
+Session 2 loaded the quick save of session 1 with the spell still running, and saw no
+transition. Its character block, taken with that save, was compared field by field with
+15 screenshots of the character sheet, the Active Effects list and the item screens:
+§10.8.
+
+The spell is Fortify Intelligence, Willpower and Magicka 100: the Willpower modifier goes
+from +59 to +159 with it, and Active Effects lists all three.
 
 ## 5. The correction rule
 
@@ -1076,7 +1139,9 @@ object.
 
 The reference installation hosts at least an attribute scaling modifier, a skill scaling
 modifier, a spell removal plugin, a tag cleaner, as well as
-[UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) via `dwmapi.dll`. The latter produces the
+[UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) via `dwmapi.dll` and, since 21 October 2026,
+[OblivionRemasteredPerformanceFix](https://github.com/LTSharpe/OblivionRemasteredPerformanceFix)
+as `version.dll`, with the ASI loader renamed to `winmm.dll`. The latter produces the
 memory dump files during a crash; it is not their cause.
 
 A mod that modifies attributes therefore also modifies the maximum magicka. The rule of
@@ -1147,8 +1212,14 @@ only the **usage** cap in certain formulas, and their Nexus pages say so explici
 Current position:
 
 - **Unreachable at base Intelligence 100**, which is the test character's case. Base
-  Intelligence cannot exceed 100 (§10.7), so any Intelligence above 100 comes from a
-  Fortify effect, hence from a **modifier**, which the watcher sees and corrects normally.
+  Intelligence cannot be **trained** past 100 (§10.7), so any Intelligence above 100 comes
+  from a Fortify effect, hence from a **modifier**, which the watcher sees and corrects
+  normally.
+- **Abilities are the exception**, `[DEDUCTION]` from §10.8: racial, birthsign and
+  vampirism bonuses sit in the base values, not in a modifier. An ability that fortifies
+  Intelligence or Magicka, gained or lost during play, would move the maximum with no
+  event. None is known on the test character. The log reports any change of base
+  Intelligence or base spell points (§10.8).
 - **Still reachable below 100**, through a level-up that raises Intelligence. Remastered
   allows up to 5 points on one attribute per level-up
   ([UESP, Remastered Leveling](https://en.uesp.net/wiki/Oblivion:Remastered_Leveling)).
@@ -1168,9 +1239,10 @@ Since 1.0.0-dev the log writes a `LEVEL UP` line with the deficit before and aft
 
 A neighboring case has, on the other hand, been ruled out: the **change of vampirism
 stage**. It modifies Strength, Speed and Willpower, never Intelligence or Magicka
-([UESP, Vampirism](https://en.uesp.net/wiki/Oblivion:Vampirism)). The watcher therefore
-does see floats move in the modifier window, but the predicted `Δmax` is 0 and no event
-is emitted — correct behavior, not a blind spot. Feeding or progressing in vampirism has
+([UESP, Vampirism](https://en.uesp.net/wiki/Oblivion:Vampirism)). The predicted `Δmax` is
+therefore 0 and no event is emitted — correct behavior, not a blind spot. (An earlier
+version said the watcher sees the stage's floats move in the modifier window. Withdrawn,
+21 October 2026: the stage bonus appears to sit in the base values, §10.8.) Feeding or progressing in vampirism has
 **no effect on the magicka pool**, only on its refill rate (§3.3).
 
 ### 10.4 Armored players: the magnitude is not guaranteed to be round
@@ -1225,10 +1297,11 @@ the log flags any decrease on which the engine raised the deficit (§6.6).
 
 What the log does not tell, and an investigation of drains would need:
 
-- whether current magicka would actually have gone below zero, because the absolute
-  maximum is not read (§10.2). Once the character data of §10.8 is validated, an estimate
-  becomes possible: `2 × (base Intelligence + modifier) + Magicka modifier + race and
-  birthsign bonuses`, to be checked once against the screen;
+- whether current magicka would actually have gone below zero. The absolute maximum is
+  not read (§10.2), but since 21 October 2026 the log prints an **estimate**,
+  `2 × (base Intelligence + modifier) + base spell points + Magicka modifier`, and the
+  current magicka it implies (estimate + deficit), on every transition. It matched the
+  screen once, with a full pool (§10.8); a partial pool has not been compared yet;
 - which effect caused a change: that needs the list of active effects, which the mod
   does not read. The per-source breakdown (§6.6) only says spell or enchantment, script, or
   engine.
@@ -1258,6 +1331,14 @@ YOUR SKILLS PAST 100**" and "**THIS DOES NOT ALLOW YOU TO LEVEL YOUR ATTRIBUTES 
 These mods therefore do not lift the **progression** cap: they make values that are already
 above 100, obtained through Fortify effects, alchemy or enchantment, actually count in the
 calculations instead of being clamped to 100.
+
+The test character's base values above 100 (Willpower, Speed, Destruction and Illusion at
+110, §10.8) do not contradict this: they are 100 plus the +10 of the vampirism stage,
+which sits in the base values. `[DEDUCTION]`
+
+Since 21 October 2026 the installation also runs OblivionRemasteredPerformanceFix 1.1.0
+(§9.5). Two sessions with it, three transitions, two writes, no failure: no interference
+seen, on little play.
 
 This distinction is decisive for this mod, and it reverses two conclusions:
 
@@ -1289,7 +1370,7 @@ skills, conversely, brings almost nothing more on cost: the hyperbolic branch of
 mod 1846 gives `0.2 × 100 / S`, i.e. 19.3% of the base cost at `S = 103.6` and still 14.97%
 at `S = 133.6`. The return decreases as `1/S`.
 
-### 10.8 Character data in the log (not yet validated)
+### 10.8 Character data in the log (validated 21 October 2026)
 
 Since 1.0.0-dev the log describes the character: level, base attributes, base skills,
 and the modifier totals of each. It also writes a line when the level, a base attribute
@@ -1349,9 +1430,49 @@ a skill rises a few points at most between two samples 250 ms apart. Anything la
 or any value going down, is treated as another save being loaded: the block is written
 again rather than reported as progress.
 
-**Validation still to do**, once, in game: compare the `PLAYER` lines with the character
-sheet (level, the 8 attributes, a few skills including Restoration). Until that is done,
-every value in those lines is `[DEDUCTION]`.
+**Validated in game on 21 October 2026.** The `PLAYER` block of session 2 (§4.9) was
+compared with 15 screenshots taken with the same save:
+
+- **Level** 37: matches.
+- **All 8 attributes**: the sheet shows base + modifier exactly, for every one. Strength
+  96 + 22 = 118, Intelligence 100 + 111 = 211, Willpower 110 + 159 = 269, Agility 88 + 11
+  = 99, Speed 110 + 9 = 119, Endurance 100 + 10 = 110, Personality 86 + 8 = 94, Luck
+  63 + 10 = 73.
+- **All 21 skills**: the same, for every one (Blade 54 + 15 = 69, Block 85 + 15 = 100,
+  the 19 others with a modifier of 0).
+- **Maximum magicka**: the sheet shows 622 = `2 × 211 + 100 + 100`, that is
+  `2 × (base Intelligence + modifier) + base spell points + Magicka modifier`. This checks
+  the factor 2 of §3.4 and the Magicka modifier read, on top of the field offsets.
+- Race, class and birthsign: the sheet says Breton, Mage, Mage. The log prints form IDs
+  `0x000224FC`, `0x000105D6` and `0x0001FD93`; no source mapping those IDs to names was
+  found, so they are not checked.
+- Base health 272 and base fatigue 0 do not explain the sheet's 621 and 849; they are not
+  used and not investigated.
+
+The TESNPC offsets in the table above are therefore **confirmed** for level, attributes,
+skills and spell points, on this game build.
+
+**What the base values hold** `[DEDUCTION]`. The Active Effects screen lists larger
+bonuses than the modifier arrays hold, and the gap matches the character's abilities:
+
+| | Active Effects | modifier arrays | gap | ability |
+|---|---:|---:|---:|---|
+| Magicka | 200 | +100 | 100 | Breton +50, Mage birthsign +50 ([UESP, Breton](https://en.uesp.net/wiki/Oblivion:Breton), [The Mage](https://en.uesp.net/wiki/Oblivion:The_Mage)) |
+| Strength | 30 | +22 | 8 | +10 vampirism; the Scales' +2 (below) is in the arrays but not listed |
+| Hand to Hand | 10 | +0 | 10 | vampirism skill bonus, 10 pts |
+| Block | 18 | +15 | 3 | Gray Prince training, 3 pts |
+
+These ability bonuses are not in the modifier arrays, and the sheet does not add them to
+the base the log reads. So they are in that base: base spell points 100 is the Breton and
+birthsign bonus, and the four base values above 100 are the vampirism stage (§10.7).
+Consequence for the fix: §10.3.
+
+**The source split.** The PLAYER lines print each modifier's split between the magic,
+script and game arrays when it is not all magic, written `+22 (m+20 s+2)`. The Scales of
+Pitiless Justice (§4.8) explain Strength +2 and Personality −2 entirely, and Intelligence
+and Agility +2 each. That leaves **−1 on Intelligence, Agility, Willpower and Speed** with
+no source on any screen; the 28 August Intelligence −1 (§4.8, event 13) is probably one of
+them. The first log with the split says which array holds them.
 
 Not done, and out of scope until validated: correcting a change of **base**
 Intelligence the way modifier changes are corrected, which would close the blind spot
