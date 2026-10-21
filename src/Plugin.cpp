@@ -750,6 +750,20 @@ void ReportOffsets() {
 // Defined after the character reader, below.
 bool EstimateMaxNow(float& out);
 
+// A sound for testers (bBeepOnReport) when the log writes something worth
+// reporting, so the player knows when to look at Active Effects and which log line
+// to send. MessageBeep is USER32, asynchronous, and safe from this thread; it calls
+// nothing in the game. At most one sound every 5 s.
+unsigned long long g_lastBeep = 0;
+void NotifyReportable(const char* what) {
+    if (!g_cfg.beepOnReport) { return; }
+    const unsigned long long now = GetTickCount64();
+    if (g_lastBeep != 0 && now - g_lastBeep < 5000) { return; }
+    g_lastBeep = now;
+    MessageBeep(MB_ICONEXCLAMATION);
+    MPF_DBG("  (sound played: %s)", what);
+}
+
 // The last spill of the overflow, for a recast that arrives in two steps
 // (Corrector.h, kRecastWindowMs; docs/SPEC.md section 5.5).
 float              g_spilled   = 0.0f;
@@ -758,6 +772,9 @@ bool               g_spillCostOnFall = false;   // the deficit dropped with the 
 
 void HandleTransition(const mpf::Transition& t, const std::string& sources) {
     ++g_stats.maxChanges;
+    if (sources.find("game") != std::string::npos) {
+        NotifyReportable("a change in the game modifier array");
+    }
 
     // Current and maximum, estimated, so a log shows whether the pool went below zero
     // (docs/SPEC.md section 10.5). current = maximum + deficit.
@@ -784,6 +801,7 @@ void HandleTransition(const mpf::Transition& t, const std::string& sources) {
                 "second case the correction below overshoots by about that amount. Please "
                 "report this log.", static_cast<double>(raised));
         mpf::Log().Escalate(200, "the engine moved the deficit on a decrease");
+        NotifyReportable("the engine moved the deficit");
     }
 
     // Calibration first, and from this same transition. A transition that settles the
@@ -795,6 +813,9 @@ void HandleTransition(const mpf::Transition& t, const std::string& sources) {
                  "\"ignores\", %d for \"handles\". The game appears to: %s",
                  g_policy.IgnoreEvidence(), g_policy.HandleEvidence(),
                  mpf::PolicyName(g_policy.Observed()));
+        if (g_policy.Contradictory() || g_policy.ContradictsPinned()) {
+            NotifyReportable("engine policy contradiction");
+        }
         if (g_policy.Contradictory()) {
             MPF_ERR("  OBSERVED: the evidence contradicts itself, which means the model "
                     "is wrong somewhere. With iEnginePolicy = 0 no correction will be "
@@ -911,6 +932,7 @@ void HandleTransition(const mpf::Transition& t, const std::string& sources) {
         } else {
             ++g_recastMissed;
             g_recastMissedPts += spilledBefore;
+            NotifyReportable("recast outside the window");
             MPF_INFO("RECAST WINDOW: the maximum rose %llu ms after falling, OUTSIDE the "
                      "%llu ms window. %.2f had spilled and stays lost. Spell cost charged "
                      "%s. If you were recasting a buff that was still active, the window "
@@ -948,6 +970,7 @@ void HandleTransition(const mpf::Transition& t, const std::string& sources) {
                   "same frame. No further attempt is made for this change.",
                   static_cast<unsigned long long>(addr));
         summary("WRITE FAILED", t.deficitAfter);
+        NotifyReportable("write failed");
         return;
     }
 
@@ -1141,6 +1164,7 @@ void LogCharacterChange(const mpf::StatsDiff& d, const mpf::BaseStats& a,
     }
     for (const int i : d.attributes) {
         if (i != mpf::kAV_Intelligence) { continue; }
+        NotifyReportable("base Intelligence changed");
         const int delta = static_cast<int>(mpf::kMagickaPerIntelligence) *
                           (static_cast<int>(b.attribute[i]) - static_cast<int>(a.attribute[i]));
         MPF_INFO("  maximum magicka moved by %+d with no correction: base Intelligence "

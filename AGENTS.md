@@ -122,7 +122,9 @@ After every change:
 ## In-game testing
 
 - **One change per session**, so each log has one explanation.
-- Test sessions run at **`iLevel = 3`** (Debug) in the maintainer's `.conf`.
+- Test sessions run at **`iLevel = 3`** (Debug) and **`bBeepOnReport = 1`** in the
+  maintainer's `.conf`. When the sound plays, the maintainer notes the time and checks
+  Active Effects in game.
 - The maintainer backs up their saves before every session. Every result needs a log.
 - First check of every session: the log's first lines show the PE timestamp `0xF19077A4`,
   `ACTIVE`, then the player being found. If the timestamp differs, stop and set

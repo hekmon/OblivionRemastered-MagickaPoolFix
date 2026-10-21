@@ -1161,6 +1161,15 @@ player's first spell, or even indefinitely.
   contradiction with the engine policy, and a `RECAST WINDOW` rise outside the window
   (§5.5), which asks to be reported. Skill-ups, the skill lines of the character block and
   the recast lines inside the window are Debug.
+- **A sound for testers**, `bBeepOnReport` (advanced section, off by default). It plays
+  the Windows "Exclamation" sound (`MessageBeep`, USER32, nothing in the game is called)
+  when the log writes something worth reporting: a recast outside the window, the engine
+  moving the deficit, a failed write, a policy contradiction, a change in the game array,
+  a change of base Intelligence. At most one every 5 s. It tells the player when to look
+  at Active Effects; the log line at that time says what happened. Added on 22 October
+  2026 after a Damage Intelligence went unnoticed in play (§4.9, session 5). Text on the
+  game's screen was ruled out: it means calling the game's UI code on its own thread,
+  which needs a hook (§6.1, §9.1).
 - **Test sessions run at `iLevel = 3`.** The shipped default stays 2, for players.
   Nothing at Debug repeats every poll: the float watch's per-poll changes are Trace.
   They were Debug until 22 October 2026, and the first session at `iLevel = 3` hit the

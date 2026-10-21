@@ -64,6 +64,7 @@ struct Config {
     // normal case, and a full heap traversal is slow and pointless when it does.
     bool heapScan         = false;
     bool floatWatch       = true;
+    bool beepOnReport     = false;       // testers only, see the .conf
     bool callVirtuals     = false;       // off by default, see the .conf
     int  pollIntervalMs   = 16;
 
@@ -411,6 +412,15 @@ iDumpTo   = 0xB88
 ; short), and always on a manual dump.
 bFloatWatch = 1
 
+; For testers. 1 plays the Windows "Exclamation" sound each time the log writes
+; something worth reporting: a recast outside its window, the engine moving the
+; deficit, a failed write, a contradiction with the engine policy, a change in
+; the game modifier array (damage, for instance), or a change of base
+; Intelligence. When you hear it, note the time and look at Active Effects in
+; game; the log line at that time says what happened. At most one sound every
+; 5 seconds. Silent if Windows system sounds are off.
+bBeepOnReport = 0
+
 ; At startup, write the loaders and mods found in the game process, one line,
 ; each with the timestamp of its own file (every module at iLevel = 3). This is
 ; how a log shows what else is installed.
@@ -712,6 +722,7 @@ inline bool LoadConfig(const std::string& path, Config& cfg) {
             else if (key == "bmoduleinventory") { detail::ParseBool(val, cfg.moduleInventory); }
             else if (key == "bheapscan")        { detail::ParseBool(val, cfg.heapScan); }
             else if (key == "bfloatwatch") { detail::ParseBool(val, cfg.floatWatch); }
+            else if (key == "bbeeponreport") { detail::ParseBool(val, cfg.beepOnReport); }
             else if (key == "bcallvirtuals") { detail::ParseBool(val, cfg.callVirtuals); }
             else if (key == "ipollintervalms" && detail::ParseInt(val, i)) {
                 if (i < 4) { i = 4; }
@@ -817,6 +828,7 @@ inline std::string NonDefaultSettings(const Config& c) {
     b("bModuleInventory", c.moduleInventory, d.moduleInventory);
     b("bHeapScan", c.heapScan, d.heapScan);
     b("bFloatWatch", c.floatWatch, d.floatWatch);
+    b("bBeepOnReport", c.beepOnReport, d.beepOnReport);
     b("bCallVirtuals", c.callVirtuals, d.callVirtuals);
     i("iPollIntervalMs", c.pollIntervalMs, d.pollIntervalMs);
     h("iMagickaModifier", c.offMagickaModifier, d.offMagickaModifier);

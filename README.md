@@ -303,7 +303,8 @@ Level-ups, base attribute changes, and anything that needs attention (`WRITE FAI
 `ENGINE MOVED THE DEFICIT`, a recast outside the window) get a line each. A status line is
 written at most once a minute. With `iLevel = 3` the log also writes the full detail of
 each change, the skills and skill-ups, and the plugin's own cost: use it when testing or
-reporting a problem. Paths are written with the user's
+reporting a problem. Testers can also set `bBeepOnReport = 1`, which plays a Windows sound
+whenever the log writes something worth reporting. Paths are written with the user's
 profile folder replaced by `%USERPROFILE%`.
 
 ## Compatibility

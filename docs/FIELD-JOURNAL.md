@@ -2668,3 +2668,14 @@ pool kept from −104, and the first game-array change (Intelligence −1, maxim
 corrected. Scenario 7 not reached before the cap.
 
 The one-line summaries read well at Info.
+
+The maintainer asked for an in-game notice when something reportable happens, since the
+Damage Intelligence of 23:49 went unnoticed. Text on the screen would mean calling the
+game's UI code on its thread, so a hook: ruled out. Agreed instead, for testers only: a
+Windows sound, `bBeepOnReport` (advanced, off by default), on a recast outside the
+window, an engine move, a failed write, a policy contradiction, a game-array change or a
+base Intelligence change, at most one every 5 s. A marker key was proposed and dropped:
+the maintainer noticed nothing odd in play, so it would not have helped here.
+
+Built: 227 OK, 0 FAIL, 0 warnings, imports unchanged (MessageBeep is USER32). Not run in
+game.
