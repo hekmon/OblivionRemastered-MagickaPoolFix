@@ -190,8 +190,10 @@ and a `.conf` that is never overwritten.
   pool (UESP describes a floor at zero for the original game; none was seen when a Fortify
   Intelligence and Magicka expired, [`docs/SPEC.md`](docs/SPEC.md) section 10.5), potions,
   altars and blessings, and a level-up that raises Intelligence.
-- **A design question**: the fix cancels a drain's effect on current magicka. Whether it
-  should is open ([`docs/SPEC.md`](docs/SPEC.md) section 10.5).
+- **Drains, decided for 1.0**: the fix treats a Drain Magicka like any other change of
+  maximum, which softens it; leaving drains to the game is planned after 1.0
+  ([`docs/SPEC.md`](docs/SPEC.md) section 10.5). A Drain Magicka on a nearly empty pool
+  has not been measured yet.
 
 That is the whole story for a reader who is not going to build or test the plugin. What
 follows is for developers: internals, test builds, build and release. The method behind
@@ -333,9 +335,15 @@ profile folder replaced by `%USERPROFILE%`.
 - **The recast window is a judgement.** One second, chosen to cover the recasts measured;
   a slower recast would still lose the overflow, and a hand swap faster than a second is
   neutral. [`docs/SPEC.md`](docs/SPEC.md) section 5.5.
-- **Drains are cancelled like any other change.** UESP documents a Drain Magicka as taking
-  current magicka; with the fix it does not, on a pool that is not full. An open design
-  question ([`docs/SPEC.md`](docs/SPEC.md) section 10.5).
+- **A Drain Magicka on you is softened.** The game takes the magnitude from current
+  magicka for the duration and gives it back at the end. The fix sees only the maximum, so
+  it cannot tell a drain from a fortify ending: a drain takes current magicka only above
+  the new maximum, and gives nothing back. A drain on a full pool therefore costs its
+  magnitude until regeneration refills it; on a pool already below the new maximum it
+  costs nothing. `[DEDUCTION]`: Damage Magicka and Absorb Magicka take current magicka
+  without changing the maximum, so the fix leaves them to the game. Leaving drains to the
+  game needs the list of active effects, planned after 1.0
+  ([`docs/SPEC.md`](docs/SPEC.md) section 10.5).
 
 ## Repository layout
 

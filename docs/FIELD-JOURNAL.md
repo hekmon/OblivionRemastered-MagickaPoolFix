@@ -2679,3 +2679,25 @@ the maintainer noticed nothing odd in play, so it would not have helped here.
 
 Built: 227 OK, 0 FAIL, 0 warnings, imports unchanged (MessageBeep is USER32). Not run in
 game.
+
+## 22 October 2026 — drains: decided for 1.0
+
+The maintainer called the drain question (SPEC §10.5) the main gap before the release, and
+noted that vanilla drains are not broken. Agreed: on a pool large enough, the game takes a
+Drain Magicka's magnitude and gives it back, as documented; the fix changes that only
+because it sees the maximum, and a drain starting looks like a fortify ending.
+
+I first argued that leaving drains to the game would need state that a save and load
+loses. That was wrong: doing nothing on a drain needs no state. Corrected in the
+discussion before anything was written.
+
+Decision: 1.0 keeps the uniform rule, written as a limitation in the README (a drain is
+softened; on a full pool it costs its magnitude and gives nothing back). After 1.0, leave
+drains to the engine by reading the player's active effects on each change of maximum.
+That is only safe if the engine does not floor a drain at zero, which the next session
+measures with a self-cast Drain Magicka 100 for 20 s at a full pool, a half pool and less
+than 100 left. UESP's table says alchemy cannot make Drain Magicka (original game), so a
+custom spell is the source.
+
+Docs only; no build.
+

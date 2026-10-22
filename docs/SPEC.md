@@ -597,7 +597,7 @@ What this session adds:
   The engine moved the maximum and left the deficit alone, as for every other change: the
   vanilla game took 22 points of current magicka at the start and gave them back at the
   end. The mod cancelled both, so **with the fix this drain cost the player nothing**.
-  Whether that is right is a design question, open in §10.5.
+  Whether that is right was a design question, decided in §10.5.
 - **An Intelligence −1 that does not end** (event 13). `[DEDUCTION]`: a Damage
   Intelligence, which lasts until restored
   ([UESP, Magical Effects](https://en.uesp.net/wiki/Oblivion:Magical_Effects#Drain_vs._Damage_vs._Absorb) contrasts it with Drain). The
@@ -1490,21 +1490,41 @@ script (the Scales of Pitiless Justice, §4.9), and, on 28 August 2026 (§4.8), 
 as a Drain Magicka 22 and a lasting Intelligence −1. Not observed: potions, altars and
 blessings, and a level-up that increases Intelligence.
 
-**Open design question: drains.** On the drain of §4.8 the engine did what it does for
-every change, and the mod did what it does for every change: it preserved current
-magicka on the way down and refused the gain on the way back. A Drain Magicka on a pool
-that is not full therefore costs the player nothing with the fix, where vanilla takes the
-magnitude away for the duration.
+**Drains: decided for 1.0 (22 October 2026).** On the drain of §4.8 the engine did what
+it does for every change, and the mod did what it does for every change: it preserved
+current magicka on the way down and refused the gain on the way back. A Drain Magicka on a
+pool that is not full therefore costs the player nothing with the fix, where vanilla takes
+the magnitude away for the duration; on a full pool it costs the magnitude and gives
+nothing back at the end.
 
 The documented behaviour is the vanilla one. For the original game, UESP describes Drain
 Magicka as one that "temporarily reduces the current and maximum magicka, however it
 cannot reduce the current Magicka below zero"
 ([UESP, Spell Making](https://en.uesp.net/wiki/Oblivion:Spell_Making#Spell_Chaining)), and
-§4.8 shows the Remastered engine taking the 22 points from current magicka. So the fix
-changes what a drain does. The glass-of-water model calls that consistent: the glass
-shrank, the water stayed below the rim. As a game rule it is a choice: a drain is meant to
-take magicka away. Telling a hostile drain apart from the expiry of the player's own
-fortify would need the list of active effects, which the mod does not read.
+§4.8 shows the Remastered engine moving only the maximum, current magicka following it
+because the deficit stays where it is. On a pool large enough, that vanilla behaviour is
+not a defect: it takes the magnitude and gives it back. The fix changes it only as a side
+effect, because a drain starting looks like a fortify ending, and a drain ending like a
+fortify starting.
+
+Decision, agreed with the maintainer: **1.0 ships the uniform rule**, documented as a
+limitation in the README. The maintainer reports drains as rare in play. **After 1.0**,
+the planned change is to leave drains to the engine: read the player's active effects
+when the maximum changes and exclude the part due to Drain Magicka or Drain Intelligence.
+That needs no state across a save and load, since the mod does nothing on those
+changes; it needs a new read-only structure to locate and validate. It is only safe if
+the engine does not floor a drain at zero (below): with a floor, a drain on a nearly empty
+pool takes less than its magnitude and gives the whole of it back, which is the reset
+UESP's Spell Chaining section uses with a "Drain Magicka 3 pts ... on Self".
+
+`[DEDUCTION]`: Damage Magicka and Absorb Magicka take current magicka without changing the
+maximum (UESP, [Magical Effects](https://en.uesp.net/wiki/Oblivion:Magical_Effects#Drain_vs._Damage_vs._Absorb)),
+so the fix leaves them to the game.
+
+To test a drain on the player: UESP's Magical Effects table (original game) lists Drain
+Magicka for spells, custom spells, built-in potions, scrolls and enchanting, but not for
+custom potions; no ingredient carries it. A custom spell, Drain Magicka on Self, is the
+controlled source. Whether Remastered keeps those availabilities has not been checked.
 
 **Open risk: a floor at zero applied by the engine.** The same page says that Fortify
 Magicka's expiry and Drain Magicka cannot take current magicka below zero. If the
