@@ -2718,3 +2718,8 @@ it will not be confirmed.
 
 Docs only; no build.
 
+Session 8 (22:46 to 23:07): nothing to correct, a third DLSS Frame Generation crash, and two
+new game-array −1 (Strength, Endurance) already in the save. The maintainer suspects enemy
+enchanted weapons; UESP points at NPC poisons as another candidate. Not chased: neither
+touches magicka.
+

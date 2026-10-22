@@ -795,6 +795,14 @@ session 6, none in session 7, no write failure, no warning, about 520 lines each
   first crash read 7.96 ms per second against 1.2 before; `[DEDUCTION]`: the dump writer
   suspending threads inflates the measure.
 
+Session 8, 22 October 2026, 22:46 to 23:07: no change of maximum, no warning, own time
+about 1.3 ms per second, and the same DLSS Frame Generation crash at the end (the third
+of the day). The save, from play in between that no log covers, carried two new −1 in the
+game array, on Strength and Endurance, which do not touch magicka. `[DEDUCTION]`: Damage
+Attribute effects received in combat. UESP's Magical Effects table lists Damage Attribute
+for potions and scrolls, and its Resist Magic note implies NPCs use poisons; the player
+suspects enchanted weapons. Not identified, and out of scope for the fix.
+
 ## 5. The correction rule
 
 Let `d` be the deficit, `m` the max, `m'` the new max, `Δ = m' − m`.
