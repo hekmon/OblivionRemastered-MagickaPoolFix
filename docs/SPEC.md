@@ -770,6 +770,31 @@ Ten transitions before the cap, seven writes, no failure:
 - No recast in two steps before the cap: scenario 7 is still untested. The three expiries
   at a full pool each logged their 300-point spill, and no rise came within the window.
 
+Sessions 6 and 7, 22 October 2026, 18:05 to 18:10 and 18:29 to 18:36, same build, from
+the quick save that ended session 5. Both ended on a game crash (below). Two transitions in
+session 6, none in session 7, no write failure, no warning, about 520 lines each:
+
+- **Scenario 1 and scenario 3**: the +300 spell cast at a full pool (the game left
+  347 / 624, the fix 47 / 624), then its expiry at a full pool (624 → 324, nothing to do).
+  Spell cost **277**, the fourth time the §4.7.3 prediction holds.
+- **The game array was empty** on every attribute, against the −1 on Intelligence,
+  Agility, Willpower and Speed and the second Intelligence −1 of session 5. The engine
+  agrees: the cast took the maximum from 324 to 624, which is `2 × 112 + 100 + 300`. The
+  restore happened in the unlogged end of session 5, after the cap. The only event the
+  player remembers there is completing Darkness Eternal (the Dark Brotherhood's gift of
+  vampirism) while already a vampire. UESP's page says the quest is not offered to a
+  vampire at all ("the Dark Gift topic will not appear", original game); the player took
+  it before turning. `[DEDUCTION]`: the quest's script cleared the game array. Not
+  confirmed, no save before it exists, and the source of the five −1 stays unknown.
+- **Two crashes, not ours.** Both dumps (`crash_2026_10_22_16_10_48.dmp` and
+  `..._16_36_46.dmp`, UTC) carry exception code 0x4000 raised by the game itself, with the
+  message "LowLevelFatalError [D3D12Util.cpp] [Line: 903] Streamline/DLSSG present failed
+  ... StreamlineD3D12RHI.cpp:425 with error DXGI_ERROR_INVALID_CALL": NVIDIA DLSS Frame
+  Generation failing to present a frame. The plugin's thread was asleep in both, and its
+  module is not on the crashing thread's stack. The own-time figure of the minute of the
+  first crash read 7.96 ms per second against 1.2 before; `[DEDUCTION]`: the dump writer
+  suspending threads inflates the measure.
+
 ## 5. The correction rule
 
 Let `d` be the deficit, `m` the max, `m'` the new max, `Δ = m' − m`.

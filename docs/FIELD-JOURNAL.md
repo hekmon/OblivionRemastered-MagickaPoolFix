@@ -2701,3 +2701,20 @@ custom spell is the source.
 
 Docs only; no build.
 
+## 22 October 2026 — sessions 6 and 7: two DLSS crashes, and an empty game array
+
+Two short sessions from the quick save that ended session 5 (SPEC §4.9). The plugin
+behaved: scenario 1 and 3 at a full pool, cost 277 for the fourth time, no warning.
+
+Both sessions ended on a crash. The dumps carry the game's own fatal error, "Streamline/
+DLSSG present failed ... DXGI_ERROR_INVALID_CALL" (code 0x4000, message read from the
+exception parameter). Our thread was asleep. Suggested to the maintainer: turn off Frame
+Generation for the test sessions; a guess from the message, not tested.
+
+The game array, which held five −1 on four attributes, was empty. The maintainer
+completed Darkness Eternal while already a vampire during the part of session 5 the log
+missed; that is the only candidate, recorded as a deduction. No manual save before it, so
+it will not be confirmed.
+
+Docs only; no build.
+
