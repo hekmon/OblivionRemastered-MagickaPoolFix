@@ -2744,3 +2744,21 @@ The 1000 ms judgement covered it with room to spare; the gap goes in the §5.5 t
 
 README: the recast window is no longer listed as untested.
 
+## 25 October 2026 — session 11: the warning to remove the plugin, wrongly
+
+The maintainer heard the sound at 23:42. The log carried the most alarming block the
+plugin has: "ENGINE BEHAVIOUR DISAGREES WITH THE CONFIGURATION", ending on "remove the
+plugin". It was wrong. The buff cost 282 and added 285 to the maximum; the deficit moved
+by −282, within 2 % of −285, and the calibrator read that as the engine compensating.
+
+The rule had a hole I had not seen: on an increase, landing on the corrected deficit is
+exactly what a cast costing the increase does. With a pinned policy every player whose
+buff costs about what it adds would get the warning on every cast. SPEC §5.3.6 already
+described the refutation (a compensating engine would imply a cost of −3), but the
+calibrator never used it. Fixed by counting "handles" only on decreases, where a cost
+cannot fake it (SPEC §5.3.2, with a withdrawn note). What it costs: a patched game is no
+longer caught on an item equipped, only on the next decrease on a partial pool.
+
+Built: 233 OK (6 new, replaying 23:42:49; the replay fails without the fix), 0 FAIL,
+0 warnings, imports unchanged, `.conf` text unchanged. Not run in game.
+

@@ -228,6 +228,45 @@ static void TestCalibration()
               t.ContradictsPinned() ? 1.0f : 0.0f, 0.0f);
     }
 
+    // 25 Oct 2026 23:42:49 -- the buff cast on a full pool, cost 282 for a maximum
+    // raised by 285. The deficit landed 3 points from the corrected value, inside the
+    // 5.71 tolerance, and was counted as "the engine handles it": the warning to remove
+    // the plugin was printed. A cost close to the increase must not count.
+    {
+        auto t = Tracker(mpf::EnginePolicy::kEngineIgnores);
+        const bool informative = t.Observe(0.0f, +285.0f, -282.0f);
+        Check("cast costing about its increase is not informative",
+              informative ? 1.0f : 0.0f, 0.0f);
+        Check("  -> no false alarm under the shipped default",
+              t.ContradictsPinned() ? 1.0f : 0.0f, 0.0f);
+        const auto d = mpf::DecideCorrection(+285.0f, 0.0f, -282.0f,
+                                             mpf::EnginePolicy::kEngineIgnores,
+                                             Glass(), true);
+        Check("  -> still corrected: 322 - 282 = 40", 607.0f + d.newDeficit, 40.0f);
+    }
+
+    // The price of the rule above, accepted: an increase that cost nothing and that a
+    // patched engine compensated in full looks the same, so it no longer counts. A
+    // patched engine is still caught on the first decrease on a partial pool.
+    {
+        auto t = Tracker(mpf::EnginePolicy::kEngineIgnores);
+        t.Observe(-100.0f, +300.0f, -400.0f);
+        Check("increase landing on the corrected value: not counted",
+              t.ContradictsPinned() ? 1.0f : 0.0f, 0.0f);
+        t.Observe(-400.0f, -300.0f, -100.0f);
+        Check("  -> the next decrease still warns",
+              t.ContradictsPinned() ? 1.0f : 0.0f, 1.0f);
+    }
+
+    // An unchanged deficit on an increase stays evidence of "ignores": a compensating
+    // engine would need the spell to refund magicka (§5.3.6).
+    {
+        auto t = Tracker();
+        t.Observe(-100.0f, +300.0f, -100.0f);
+        CheckPolicy("item equipped, deficit frozen", t.Policy(),
+                    mpf::EnginePolicy::kEngineIgnores);
+    }
+
     // A save load resets the evidence.
     {
         auto t = Tracker();

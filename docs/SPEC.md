@@ -831,6 +831,18 @@ shapes, and correct.** Seven changes of maximum, seven writes, no failure.
 Both recasts end at "current lower by the spell cost only", exactly. The sound the player
 heard when quitting was not the plugin's: no "(sound played" line.
 
+Session 11, 25 October 2026, 21:51 to past 23:43, same build: **a false alarm, and a bug.**
+At 23:42:49 the buff, cast on a full pool at 95 % magnitude, cost 282 and raised the
+maximum by 285. The deficit went from 0 to −282, 3 points from the −285 a compensating
+engine would leave, inside the tolerance (5.71). The calibration counted it as "the engine
+handles it", and the plugin printed the error block of §5.3.5, which tells the player to
+set `iEnginePolicy = 2` or remove the plugin, and played its sound. The correction itself
+was right (322 − 282 = 40), and the debug line two lines above it said "compensated in
+full: −3, impossible". Fixed in §5.3.2. The cost was 282 here, against 277 in session 10
+at the same magnitude: the player had switched to a warrior build (heavy armor, sword and
+shield, some rings changed). `[DEDUCTION]`: an item removed carried part of what the cost
+formula uses, as in §4.7.3.
+
 ## 5. The correction rule
 
 Let `d` be the deficit, `m` the max, `m'` the new max, `Δ = m' − m`.
@@ -931,6 +943,28 @@ Let `c = min(d − Δ, 0)` be the expected correct value (§5.1). For a transiti
 - if `|d_after − c| ≤ tolerance` **and** `|c − d_before| > tolerance`: the engine reached
   the right value → evidence of `kEngineHandles`;
 - otherwise: uninformative, no evidence counted.
+
+**The second rule applies to decreases only** (since 25 October 2026). On an increase, a
+spell cast in the same poll moves the deficit down by its cost, and a cost close to the
+increase lands on `c` exactly as a compensating engine would. A self-cast buff always
+carries its cost, so a buff whose cost is close to the maximum it adds does this on
+every cast. Measured: the buff at 95 % magnitude, cost 282, maximum +285, deficit 0 →
+−282 against `c = −285`, inside the tolerance of 5.71 (§4.9, session 11). It was counted
+as `kEngineHandles`, and under the pinned default the warning of §5.3.5 told the player to
+remove the plugin. On a decrease a cost moves the deficit away from `c`, so landing on `c`
+remains proof. On an increase, only the first rule can conclude: an unchanged deficit
+under a compensating engine would need a spell that refunds magicka (§5.3.6).
+
+Withdrawn: the earlier version of this section listed equipping an item and drinking a
+potion as unambiguous on both rules. They are, but the mod cannot tell them from a cast,
+and that is what it would need for the second rule on an increase. The cost of the
+restriction: a patched game that compensates is no longer caught on an item equipped, only
+on the first decrease on a partial pool (a buff expiring, an item removed).
+
+The mirror case stays counted: an unchanged deficit on a decrease that is really a cost
+equal to the decrease, paid in the same poll. That needs a cast timed within the same
+16 ms as an expiry, not just a spell whose numbers happen to match, and under the shipped
+default it agrees with the pinned value, so it prints nothing.
 
 The second condition of each of the first two rules is not decorative. Without it, a
 transition where **doing nothing is precisely the correct behavior** would be counted as

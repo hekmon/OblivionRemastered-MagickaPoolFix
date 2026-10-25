@@ -264,6 +264,18 @@ public:
         const bool corrected = std::fabs(deficitAfter - correct) <= tol;
 
         if (unchanged) { ++ignores_; return true; }
+
+        // On an increase, a deficit that landed on the corrected value is not proof
+        // that the engine compensated: a spell cast in the same poll, costing about as
+        // much as the increase, moves the deficit there too. A self-cast buff always
+        // carries its cost, so a buff whose cost is close to the maximum it adds does
+        // this on every cast: 25 October 2026, cost 282 for +285, read as "handles"
+        // and the warning to remove the plugin was printed (docs/SPEC.md §5.3.2). On a
+        // decrease a cost cannot fake it, because it moves the deficit the other way.
+        // The mirror case, an unchanged deficit on a decrease that is really a cost
+        // equal to the decrease paid in the same poll, needs a cast timed within the
+        // same 16 ms as an expiry; it stays counted.
+        if (corrected && deltaMax > 0.0f) { return false; }
         if (corrected) { ++handles_; return true; }
 
         // Neither: something was paid for during the same transition, or the model is
