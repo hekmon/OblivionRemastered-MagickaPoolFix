@@ -180,13 +180,17 @@ sessions, the longest 1 h 37 min, 52 transitions in all, no failure, no error li
   vampirism stage changes, which do not touch magicka.
 
 Every number is in [`docs/SPEC.md`](docs/SPEC.md), sections 4.6 to 4.9. Since 0.9.1 the
-rule itself has not changed. 1.0.0-dev adds the recast window above, which has not been
-run in game yet, a log that describes the game build, the loaded mods and the character,
-and a `.conf` that is never overwritten.
+rule itself has not changed. 1.0.0-dev adds the recast window above, a log that describes
+the game build, the loaded mods and the character, and a `.conf` that is never overwritten.
+
+On **25 October 2026** the recast window was seen working: a recast of the buff while it
+was active cost exactly the spell, once when the game swapped the effect in one step and
+once in two steps 156 ms apart. A Drain Magicka from a necromancer was measured from start
+to end.
 
 **Open:**
 
-- **Not yet tested in game**: the recast window, a Fortify Magicka alone expiring at a low
+- **Not yet tested in game**: a Fortify Magicka alone expiring at a low
   pool (UESP describes a floor at zero for the original game; none was seen when a Fortify
   Intelligence and Magicka expired, [`docs/SPEC.md`](docs/SPEC.md) section 10.5), potions,
   altars and blessings, and a level-up that raises Intelligence.

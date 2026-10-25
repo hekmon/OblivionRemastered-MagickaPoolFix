@@ -767,7 +767,7 @@ Ten transitions before the cap, seven writes, no failure:
 - **First game-array change** (23:49:26): Intelligence −1 in the game array, maximum −2,
   pool 174 kept. The game array now holds −2 on Intelligence. `[DEDUCTION]`: another
   Damage Intelligence; the player did not report its source.
-- No recast in two steps before the cap: scenario 7 is still untested. The three expiries
+- No recast in two steps before the cap: scenario 7 was still untested (measured in session 10). The three expiries
   at a full pool each logged their 300-point spill, and no rise came within the window.
 
 Sessions 6 and 7, 22 October 2026, 18:05 to 18:10 and 18:29 to 18:36, same build, from
@@ -813,6 +813,23 @@ pool to 302 / 302: the game left 324 / 324 and the fix wrote the deficit back to
 §4.8 had the same kind of source. The sound the player heard twice was not the plugin's: the
 log writes "(sound played: ...)" for each of its sounds and has none; the two sounds
 matched the player switching windows.
+
+Session 10, 25 October 2026, 12:50 to 13:14, same build: **scenario 7 measured, in both
+shapes, and correct.** Seven changes of maximum, seven writes, no failure.
+
+- **Recast in one step** (13:07:39), at 95 % magnitude because armor was now worn
+  (§10.4): the buff went from 100 to 95 and the cost of 277 was charged in the same poll,
+  so the maximum moved by −15 only. The game left 69.2 / 609; the fix wrote 84.2 / 609,
+  which is the 361.2 before, minus 277.
+- **Recast in two steps** (13:08:35.536 and .700, 156 ms apart): the fall took the pool
+  from 327 / 609 to 42 / 324 in the game, and the fix to 324 / 324, spilling 3; the rise
+  charged the cost. The game left 332 / 609; the fix wrote 50 / 609, which is 327 − 277,
+  the 3 spilled points given back by the window of §5.5. Without the window the recast
+  would have cost 280.
+- Two more expiries at a partial pool, where the game would have left −75 and −20.
+
+Both recasts end at "current lower by the spell cost only", exactly. The sound the player
+heard when quitting was not the plugin's: no "(sound played" line.
 
 ## 5. The correction rule
 
@@ -1045,6 +1062,7 @@ one hand swap:
 |---|---|
 | 17 ms | a recast: the cost came with the fall, and an expiry costs nothing |
 | 115 ms, 680 ms | cost with the rise: a recast in two steps, or an expiry landing just before a cast already under way. Not distinguishable from the log; to the player, the same act |
+| 156 ms | a recast in two steps with the window in place (25 October, §4.9 session 10): the cost came with the rise, 3 spilled points given back |
 | 700 ms | the fastest item removed and put back by hand (28 August, §4.8) |
 | 2.09 s | most likely a new cast after the buff ran out |
 

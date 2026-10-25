@@ -2734,3 +2734,13 @@ The maintainer heard the exclamation sound twice when switching windows, with no
 "(sound played" line in the log, so it was not the plugin. The plugin uses the same
 Windows sound as other programs; after 1.0, consider a sound of its own.
 
+## 25 October 2026 — session 10: scenario 7, both shapes
+
+The recast while the buff is active, open since the window went in (SPEC §5.5, chapter 8
+scenario 7), happened twice in normal play (SPEC §4.9, session 10). In one step, at 95 %
+magnitude after putting armor on: 361.2 → 84.2, the cost exactly. In two steps, 156 ms
+apart: 327 → 50, the cost exactly, the window giving back the 3 points the fall spilled.
+The 1000 ms judgement covered it with room to spare; the gap goes in the §5.5 table.
+
+README: the recast window is no longer listed as untested.
+
