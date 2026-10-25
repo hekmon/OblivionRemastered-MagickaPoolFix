@@ -2723,3 +2723,14 @@ new game-array −1 (Strength, Endurance) already in the save. The maintainer su
 enchanted weapons; UESP points at NPC poisons as another candidate. Not chased: neither
 touches magicka.
 
+## 25 October 2026 — session 9: a drain, start to end
+
+A necromancer's Drain Magicka 22, on a full pool (SPEC §4.9, session 9). Start: nothing to
+do, as vanilla. End: the game gave 22 back, the fix took them away again. The engine moved
+nothing. The drain case decided in SPEC §10.5 now has one measurement at a full pool; the
+start of a drain on a nearly empty pool is still unmeasured.
+
+The maintainer heard the exclamation sound twice when switching windows, with no
+"(sound played" line in the log, so it was not the plugin. The plugin uses the same
+Windows sound as other programs; after 1.0, consider a sound of its own.
+

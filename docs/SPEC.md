@@ -803,6 +803,17 @@ Attribute effects received in combat. UESP's Magical Effects table lists Damage 
 for potions and scrolls, and its Resist Magic note implies NPCs use poisons; the player
 suspects enchanted weapons. Not identified, and out of scope for the fix.
 
+Session 9, 25 October 2026, from 11:39, same build: **a Drain Magicka 22 measured end to
+end**, cast by a necromancer (the player's report). It started at 12:20:57 on a full pool:
+the maximum went from 324 to 302 and the pool stayed full at 302, the same as vanilla, so
+nothing to do. It ended at 12:23:23, 2 min 26 s later, after regeneration had refilled the
+pool to 302 / 302: the game left 324 / 324 and the fix wrote the deficit back to −22,
+302 / 324. The engine did not move the deficit at either end. This is the full-pool case of
+§10.5: the drain cost its 22 points and gave nothing back. `[DEDUCTION]`: the drain 22 of
+§4.8 had the same kind of source. The sound the player heard twice was not the plugin's: the
+log writes "(sound played: ...)" for each of its sounds and has none; the two sounds
+matched the player switching windows.
+
 ## 5. The correction rule
 
 Let `d` be the deficit, `m` the max, `m'` the new max, `Δ = m' − m`.
