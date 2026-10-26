@@ -193,7 +193,7 @@ to end.
 - **Not yet tested in game**: a Fortify Magicka alone expiring at a low
   pool (UESP describes a floor at zero for the original game; none was seen when a Fortify
   Intelligence and Magicka expired, [`docs/SPEC.md`](docs/SPEC.md) section 10.5), potions,
-  altars and blessings, and a level-up that raises Intelligence.
+  blessings, and a level-up that raises Intelligence.
 - **Drains, decided for 1.0**: the fix treats a Drain Magicka like any other change of
   maximum, which softens it; leaving drains to the game is planned after 1.0
   ([`docs/SPEC.md`](docs/SPEC.md) section 10.5). A Drain Magicka on a nearly empty pool

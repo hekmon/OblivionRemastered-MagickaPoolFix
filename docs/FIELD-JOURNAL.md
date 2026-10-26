@@ -2762,3 +2762,11 @@ longer caught on an item equipped, only on the next decrease on a partial pool.
 Built: 233 OK (6 new, replaying 23:42:49; the replay fails without the fix), 0 FAIL,
 0 warnings, imports unchanged, `.conf` text unchanged. Not run in game.
 
+## 26 October 2026 — a restore of the game array
+
+The sound played at 21:34:06 when the maintainer used an ichor pool at a Sithis shrine:
+the game array's Intelligence −2 went back to 0, maximum +4 on a full pool, kept at 320 /
+324 by the fix (SPEC §10.5). It was the optional "Restore Intelligence" test left open
+since session 5, and the first time the sound flagged an event the maintainer could tie
+to an action in game.
+

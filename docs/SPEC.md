@@ -1583,8 +1583,16 @@ logged on 28 August 2026 (§4.8, event 11): `+285`, corrected like any other.
 
 Measured so far: fortifications cast by the player, an enchanted ring, an item acting by
 script (the Scales of Pitiless Justice, §4.9), and, on 28 August 2026 (§4.8), what reads
-as a Drain Magicka 22 and a lasting Intelligence −1. Not observed: potions, altars and
+as a Drain Magicka 22 and a lasting Intelligence −1; since then a Drain Magicka from start
+to end (§4.9, session 9) and a restore of the game array (below). Not observed: potions,
 blessings, and a level-up that increases Intelligence.
+
+**A restore, measured** (26 October 2026, 21:34:06). The player used an ichor pool ("Bassin
+d'ichor" in the French interface) at the Sithis shrine of a vampire / Dark Brotherhood
+lair. The game array's Intelligence went from −2 to 0, the maximum from 320 to 324, on a
+full pool: the game left 324 / 324, the fix 320 / 324, and the sound of §6.6 played as
+designed. A restore is a change of maximum like any other: the water stays, as it stayed
+when the damage spilled it. The engine did not move the deficit.
 
 **Drains: decided for 1.0 (22 October 2026).** On the drain of §4.8 the engine did what
 it does for every change, and the mod did what it does for every change: it preserved
