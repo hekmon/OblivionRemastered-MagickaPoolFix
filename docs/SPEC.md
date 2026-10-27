@@ -843,6 +843,20 @@ at the same magnitude: the player had switched to a warrior build (heavy armor, 
 shield, some rings changed). `[DEDUCTION]`: an item removed carried part of what the cost
 formula uses, as in §4.7.3.
 
+Session of 26 to 27 October 2026, 23:17 to 02:05, build of 25 October 23:47 (the §5.3.2
+fix): 20 changes of maximum, 14 corrected, 0 write failures, no warning. Cost 276 at both
+100 % and 95 % magnitude. **The first recast in two steps with the cost charged with the
+fall, the window in place** (23:52:47.272 and .288, 16 ms apart):
+
+- the fall, on a full pool of 609: the game took the buff off and charged the cost in the
+  same poll, leaving 48 / 324 (609 − 285 − 276). The fix wrote 324 / 324: the 333 the
+  recast should leave, clamped to the new maximum, 9 points spilled;
+- the rise, free in the game (609 / 609): the fix wrote 333 / 609, the 9 spilled points
+  given back by the window.
+
+333 = 609 − 276: the spell cost, nothing else, as in the one-step recast and the
+cost-with-the-rise shape of session 10. Without the window it would have cost 285.
+
 ## 5. The correction rule
 
 Let `d` be the deficit, `m` the max, `m'` the new max, `Δ = m' − m`.
@@ -1097,6 +1111,7 @@ one hand swap:
 | 17 ms | a recast: the cost came with the fall, and an expiry costs nothing |
 | 115 ms, 680 ms | cost with the rise: a recast in two steps, or an expiry landing just before a cast already under way. Not distinguishable from the log; to the player, the same act |
 | 156 ms | a recast in two steps with the window in place (25 October, §4.9 session 10): the cost came with the rise, 3 spilled points given back |
+| 16 ms | a recast in two steps with the window in place (26 October, §4.9): the cost came with the fall, 9 spilled points given back |
 | 700 ms | the fastest item removed and put back by hand (28 August, §4.8) |
 | 2.09 s | most likely a new cast after the buff ran out |
 

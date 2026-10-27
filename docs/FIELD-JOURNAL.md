@@ -2770,3 +2770,13 @@ the game array's Intelligence −2 went back to 0, maximum +4 on a full pool, ke
 since session 5, and the first time the sound flagged an event the maintainer could tie
 to an action in game.
 
+
+## 27 October 2026 — the other shape of a recast in two steps
+
+Session of 26 October, 23:17 to 02:05 (SPEC §4.9). At 23:52:47 a recast came as a fall
+then a rise 16 ms apart, with the cost charged on the fall, not the rise as in session
+10. The fall spilled 9 points above the unbuffed maximum; the window gave them back on the
+rise, and the pool ended at 609 − 276, the spell cost only. Both shapes of §5.5 are now
+measured with the window in place. The other eighteen changes of maximum were as expected.
+
+Docs only; no build.
