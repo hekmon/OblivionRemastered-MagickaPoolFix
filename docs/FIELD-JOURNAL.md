@@ -2780,3 +2780,14 @@ rise, and the pool ended at 609 − 276, the spell cost only. Both shapes of §5
 measured with the window in place. The other eighteen changes of maximum were as expected.
 
 Docs only; no build.
+
+## 28 October 2026 — a wisp's Damage Intelligence, read while paused
+
+The sound played at 00:31:13 during a fight with will-o'-the-wisps. The maintainer paused
+the game and the log was read at once: Intelligence −1 in the game array, maximum 324 →
+322, the pool kept at 164 (SPEC §4.9). The earlier Intelligence damages (28 August and
+session 5) had no known source; this one does: UESP's "Mind Numb", Damage Intelligence 2, halved
+to 1 by the Breton's Resist Magic 50 % `[DEDUCTION]`. It is what the sound was added for
+on 22 October: tell the player when to look, while the cause is still on screen.
+
+Docs only; no build. Session still running.

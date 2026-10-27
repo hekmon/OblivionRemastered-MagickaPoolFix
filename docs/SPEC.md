@@ -857,6 +857,23 @@ fall, the window in place** (23:52:47.272 and .288, 16 ms apart):
 333 = 609 − 276: the spell cost, nothing else, as in the one-step recast and the
 cost-with-the-rise shape of session 10. Without the window it would have cost 285.
 
+Session of 27 to 28 October 2026, from 22:05, same build: **a game-array damage with its
+source seen in play** (00:31:13.869). The player was fighting will-o'-the-wisps with fire
+balls; one got close. The game array's Intelligence went from 0 to −1 (modifier total 12 →
+11), maximum 324 → 322, on a pool that was not full: the game left 162 / 322, the fix 164 /
+322. The sound of §6.6 played, the player paused the game and the log was read at once.
+The other three changes of the minute were ordinary: the buff cast at 00:29:47 (48 / 624
+after a cost of 276) and its expiry at 00:31:05, where vanilla would have left −51 / 324
+and the fix kept 249 / 324.
+
+UESP gives the wisp's touch spell "Mind Numb" as "Absorb Health & Magicka 8pts for 5sec,
+Damage Intelligence & Willpower 2pts; all on Touch"
+([UESP, Will-o-the-Wisp](https://en.uesp.net/wiki/Oblivion:Will-o-the-Wisp)). The log
+measured −1, not −2. `[DEDUCTION]`: the character is a Breton, "Resist Magic 50% on self,
+constant" ([UESP, Breton](https://en.uesp.net/wiki/Oblivion:Breton)), and half of 2 is 1.
+Not checked: the Willpower damage (the plugin does not watch Willpower) and the absorbed
+magicka (it moves current magicka only, not the maximum, so the plugin has nothing to do).
+
 ## 5. The correction rule
 
 Let `d` be the deficit, `m` the max, `m'` the new max, `Δ = m' − m`.
@@ -1599,7 +1616,8 @@ logged on 28 August 2026 (§4.8, event 11): `+285`, corrected like any other.
 Measured so far: fortifications cast by the player, an enchanted ring, an item acting by
 script (the Scales of Pitiless Justice, §4.9), and, on 28 August 2026 (§4.8), what reads
 as a Drain Magicka 22 and a lasting Intelligence −1; since then a Drain Magicka from start
-to end (§4.9, session 9) and a restore of the game array (below). Not observed: potions,
+to end (§4.9, session 9), a restore of the game array (below), and a creature's Damage
+Intelligence with its source seen in play (a will-o'-the-wisp, §4.9, 28 October). Not observed: potions,
 blessings, and a level-up that increases Intelligence.
 
 **A restore, measured** (26 October 2026, 21:34:06). The player used an ichor pool ("Bassin
