@@ -2791,3 +2791,19 @@ to 1 by the Breton's Resist Magic 50 % `[DEDUCTION]`. It is what the sound was a
 on 22 October: tell the player when to look, while the cause is still on screen.
 
 Docs only; no build. Session still running.
+
+## 28 October 2026 — a restore comes in eleven steps
+
+At 01:19:04 the maintainer cast a Restore Attribute (all, 5 pts) spell they made for the
+occasion. The sound played; the log showed the game array's Intelligence going back from
+11 to 12 not in one poll but in eleven, one per frame over 165 ms, about 0.08 at a time
+(SPEC §4.9). Every step was corrected and the pool ended right: 282 / 324, current
+magicka unchanged.
+
+What it shows about the plugin: at the player level the log printed eleven `MAX +0` lines
+for one restore, and the calibrator counted eleven observations where there was one.
+Neither changes a correction. A fix would merge changes of maximum that come in
+consecutive polls into one log line and one observation; it is a code change, to be
+decided by the maintainer, not made here.
+
+Docs only; no build. Session still running.

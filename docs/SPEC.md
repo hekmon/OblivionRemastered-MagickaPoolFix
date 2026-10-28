@@ -874,6 +874,26 @@ constant" ([UESP, Breton](https://en.uesp.net/wiki/Oblivion:Breton)), and half o
 Not checked: the Willpower damage (the plugin does not watch Willpower) and the absorbed
 magicka (it moves current magicka only, not the maximum, so the plugin has nothing to do).
 
+The game was restarted at 01:03 (the log above was truncated by the restart, as designed).
+At 01:19:04 the player cast a "Restore Attribute, all, 5 pts" spell of their own making,
+cost 40 (deficit 0 → −40 just before). **The restore did not land in one poll: it came in
+eleven, from 01:19:04.034 to .199 (165 ms, one per frame)**, the game array's Intelligence
+rising 11 → 11.155 → 11.235 → … → 11.945 → 12.000, by about 0.08 per frame, 0.155 and 0.16
+when two frames fell in one poll. Only the one damaged point was restored; the 5 points
+of the spell are a ceiling. Each step was corrected like any other change of maximum
+(the "free magicka" verdict, the deficit written down by twice the step), and the pool
+ended at 282 / 324: current magicka unchanged, maximum back to 324. Not compared: whether
+the ichor pool of 26 October (§10.5) also came in steps; that log is gone.
+
+Two consequences for the plugin, neither a correction error:
+
+- **The player-level log printed eleven lines for one restore**, each reading `MAX +0`
+  because the step rounds to zero (§6.6 promises one line per change of maximum; here one
+  event in game is eleven changes in memory). The sound played once (5 s throttle).
+- **The calibrator counted eleven "ignores"** for one event (§5.3.2). Harmless with the
+  shipped `iEnginePolicy = 1`; under auto-detection it weighs one restore as eleven
+  independent observations (the Debug line ends at `Evidence now: 11 for "ignores"`).
+
 ## 5. The correction rule
 
 Let `d` be the deficit, `m` the max, `m'` the new max, `Δ = m' − m`.
@@ -1617,7 +1637,9 @@ Measured so far: fortifications cast by the player, an enchanted ring, an item a
 script (the Scales of Pitiless Justice, §4.9), and, on 28 August 2026 (§4.8), what reads
 as a Drain Magicka 22 and a lasting Intelligence −1; since then a Drain Magicka from start
 to end (§4.9, session 9), a restore of the game array (below), and a creature's Damage
-Intelligence with its source seen in play (a will-o'-the-wisp, §4.9, 28 October). Not observed: potions,
+Intelligence with its source seen in play (a will-o'-the-wisp, §4.9, 28 October), and a
+Restore Attribute spell, which the game applies over about ten frames in fractional steps
+(§4.9, 28 October). Not observed: potions,
 blessings, and a level-up that increases Intelligence.
 
 **A restore, measured** (26 October 2026, 21:34:06). The player used an ichor pool ("Bassin
